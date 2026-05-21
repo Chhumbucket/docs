@@ -1,0 +1,8 @@
+body {
+  background-image: linear-gradient(180deg, rgba(180, 83, 9, 0.04) 0%, transparent 40%);
+}
+
+.dark body {
+  background-image: linear-gradient(180deg, rgba(245, 158, 11, 0.05) 0%, transparent 40%);
+}
+

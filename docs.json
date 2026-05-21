@@ -8,27 +8,31 @@
     "dark": "/images/mandate-black.png"
   },
   "colors": {
-    "primary": "#040404",
-    "light": "#F7F4EF",
+    "primary": "#B45309",
+    "light": "#F59E0B",
     "dark": "#B45309"
   },
+  "css": "/custom.css",
   "navbar": {
     "primary": {
-      "type": "github",
-      "href": "https://github.com/morganfung/mandate"
+      "type": "button",
+      "label": "Dashboard",
+      "href": "https://www.usemandate.io/dashboard"
     }
   },
   "navigation": {
     "tabs": [
       {
-        "tab": "Documentation",
+        "tab": "Home",
         "groups": [
           {
             "group": "Get Started",
             "pages": [
               "introduction",
               "quickstart",
-              "sandbox"
+              "sandbox",
+              "api/authentication",
+              "api/errors"
             ]
           },
           {
@@ -59,26 +63,7 @@
       },
       {
         "tab": "API Reference",
-        "groups": [
-          {
-            "group": "Overview",
-            "pages": [
-              "api/authentication",
-              "api/errors"
-            ]
-          },
-          {
-            "group": "Endpoints",
-            "pages": [
-              "api/agents",
-              "api/mandates",
-              "api/policy",
-              "api/payments",
-              "api/transactions",
-              "api/audit-log"
-            ]
-          }
-        ]
+        "openapi": "openapi.json"
       }
     ]
   }
