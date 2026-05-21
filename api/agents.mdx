@@ -1,0 +1,272 @@
+---
+title: "REST API Endpoints for Agents"
+sidebarTitle: "Agents"
+description: "Create and manage the AI agents that operate under your account. Each agent carries an identity that mandates and policy checks are scoped to."
+---
+
+Agents are the AI entities that act on behalf of your users or systems. You register an agent once, attach one or more mandates to it, and Mandate's policy engine uses the agent's identity to authorize every purchase the agent attempts. An agent can be revoked at any time, instantly blocking all future spend.
+
+---
+
+## Create an agent
+
+<br />
+
+```
+POST /v1/agents
+```
+
+Creates a new agent scoped to your account. The agent starts with `status: "active"` and can begin making policy-governed payments immediately.
+
+**Request body**
+
+<ParamField body="name" type="string" required>
+  A human-readable name for the agent. Used in the dashboard and transaction records.
+</ParamField>
+
+<ParamField body="description" type="string">
+  An optional description of what the agent does — for example, `"Fetches company data from financial APIs"`.
+</ParamField>
+
+<ParamField body="capabilities" type="string[]">
+  An optional list of capability tags that describe what actions this agent can perform, e.g. `["data-fetch", "financial-research"]`. Not enforced by policy; used for organizational purposes.
+</ParamField>
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST https://api.kya.dev/v1/agents \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "name": "Research Assistant",
+    "description": "Fetches company data from financial APIs",
+    "capabilities": ["data-fetch", "financial-research"]
+  }'
+```
+
+```typescript TypeScript
+const res = await fetch("https://api.kya.dev/v1/agents", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer ky_sand_••••••••••••••••",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    name: "Research Assistant",
+    description: "Fetches company data from financial APIs",
+    capabilities: ["data-fetch", "financial-research"],
+  }),
+});
+const agent = await res.json();
+```
+
+</CodeGroup>
+
+**Response `201`**
+
+<ResponseField name="id" type="string" required>
+  Unique agent identifier, prefixed with `agent_`.
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  The name you provided at creation.
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  The description you provided at creation, or `null` if omitted.
+</ResponseField>
+
+<ResponseField name="capabilities" type="string[]" required>
+  The capabilities array you provided, or `[]` if omitted.
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Always `"active"` for a newly created agent. Possible values: `"active"`, `"revoked"`.
+</ResponseField>
+
+<ResponseField name="sandbox" type="boolean" required>
+  `true` if the agent was created with a sandbox API key.
+</ResponseField>
+
+<ResponseField name="revoked_at" type="string">
+  ISO 8601 timestamp set when the agent is revoked. `null` while active.
+</ResponseField>
+
+<ResponseField name="created_at" type="string" required>
+  ISO 8601 creation timestamp.
+</ResponseField>
+
+<ResponseField name="updated_at" type="string" required>
+  ISO 8601 timestamp of the last update.
+</ResponseField>
+
+```json Example response
+{
+  "id": "agent_abc123",
+  "name": "Research Assistant",
+  "description": "Fetches company data from financial APIs",
+  "capabilities": ["data-fetch", "financial-research"],
+  "status": "active",
+  "sandbox": true,
+  "revoked_at": null,
+  "created_at": "2024-01-15T10:00:00Z",
+  "updated_at": "2024-01-15T10:00:00Z"
+}
+```
+
+---
+
+## List agents
+
+<br />
+
+```
+GET /v1/agents
+```
+
+Returns all agents belonging to your account, ordered by creation date descending.
+
+<CodeGroup>
+
+```bash cURL
+curl https://api.kya.dev/v1/agents \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••"
+```
+
+```typescript TypeScript
+const res = await fetch("https://api.kya.dev/v1/agents", {
+  headers: { Authorization: "Bearer ky_sand_••••••••••••••••" },
+});
+const { agents } = await res.json();
+```
+
+</CodeGroup>
+
+**Response `200`**
+
+<ResponseField name="agents" type="object[]" required>
+  Array of agent objects. Each object has the same shape as the response from `POST /v1/agents`.
+</ResponseField>
+
+```json Example response
+{
+  "agents": [
+    {
+      "id": "agent_abc123",
+      "name": "Research Assistant",
+      "description": "Fetches company data from financial APIs",
+      "capabilities": ["data-fetch", "financial-research"],
+      "status": "active",
+      "sandbox": true,
+      "revoked_at": null,
+      "created_at": "2024-01-15T10:00:00Z",
+      "updated_at": "2024-01-15T10:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+## Get an agent
+
+<br />
+
+```
+GET /v1/agents/{agent_id}
+```
+
+Retrieves a single agent by ID. Returns `404` if the agent does not exist or does not belong to your account.
+
+**Path parameters**
+
+<ParamField path="agent_id" type="string" required>
+  The agent ID to retrieve, e.g. `agent_abc123`.
+</ParamField>
+
+<CodeGroup>
+
+```bash cURL
+curl https://api.kya.dev/v1/agents/agent_abc123 \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••"
+```
+
+```typescript TypeScript
+const res = await fetch("https://api.kya.dev/v1/agents/agent_abc123", {
+  headers: { Authorization: "Bearer ky_sand_••••••••••••••••" },
+});
+const agent = await res.json();
+```
+
+</CodeGroup>
+
+**Response `200`**
+
+Returns the agent object. See [Create an agent](#create-an-agent) for the full field list.
+
+**Error responses**
+
+| Status | Detail       | Cause                                                  |
+| ------ | ------------ | ------------------------------------------------------ |
+| `404`  | `not_found`  | Agent does not exist or belongs to a different account.|
+
+---
+
+## Revoke an agent
+
+<br />
+
+```
+PATCH /v1/agents/{agent_id}/revoke
+```
+
+Permanently revokes an agent. After revocation, all policy evaluations and payment verifications for this agent are denied with `agent_revoked`. This action is irreversible — you cannot re-activate a revoked agent.
+
+**Path parameters**
+
+<ParamField path="agent_id" type="string" required>
+  The agent ID to revoke.
+</ParamField>
+
+<Warning>
+  Revoking an agent is permanent and cannot be undone. Any in-flight SDK calls that reference this agent will fail immediately. If you need to temporarily pause an agent, revoke its mandate instead.
+</Warning>
+
+<CodeGroup>
+
+```bash cURL
+curl --request PATCH https://api.kya.dev/v1/agents/agent_abc123/revoke \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••"
+```
+
+```typescript TypeScript
+const res = await fetch("https://api.kya.dev/v1/agents/agent_abc123/revoke", {
+  method: "PATCH",
+  headers: { Authorization: "Bearer ky_sand_••••••••••••••••" },
+});
+const agent = await res.json();
+```
+
+</CodeGroup>
+
+**Response `200`**
+
+Returns the updated agent object with `status: "revoked"` and `revoked_at` set to the revocation timestamp.
+
+```json Example response
+{
+  "id": "agent_abc123",
+  "name": "Research Assistant",
+  "status": "revoked",
+  "revoked_at": "2024-01-16T09:00:00Z",
+  "created_at": "2024-01-15T10:00:00Z",
+  "updated_at": "2024-01-16T09:00:00Z"
+}
+```
+
+**Error responses**
+
+| Status | Detail                          | Cause                                    |
+| ------ | ------------------------------- | ---------------------------------------- |
+| `400`  | `Agent not found or already revoked` | Agent is already revoked or not found.|

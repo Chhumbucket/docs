@@ -1,0 +1,156 @@
+---
+title: "Test Payments with the Mandate Sandbox"
+description: "Test end-to-end payment flows — agent registration, mandate enforcement, and proof verification — without spending real USDC on Base."
+---
+
+The Mandate sandbox gives you a complete simulation of the production payment flow. Everything works the same way — agent identity checks, mandate policy evaluation, proof issuance, and seller verification — except that proofs are HMAC-SHA256 signatures instead of on-chain USDC transfers. You can test every success path, every policy denial, and every error condition without moving real money.
+
+## Getting a sandbox API key
+
+Sandbox keys are issued automatically when you create an account at [usemandate.xyz](https://usemandate.xyz). You can also generate additional sandbox keys from the dashboard under **Settings → API Keys**.
+
+Sandbox keys always start with `ky_sand_`:
+
+```
+ky_sand_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+The `KyaPaymentsClient` detects the key prefix and sets `client.sandbox = true` automatically. You do not need to configure the sandbox environment separately.
+
+<Note>
+  `POST /v1/payments/proof` returns `400` if you send a production API key. Proof issuance is environment-scoped — sandbox keys generate sandbox proofs and production keys generate production proofs.
+</Note>
+
+## How sandbox proofs work
+
+In production, a payment proof represents a verified USDC transaction on Base mainnet. In the sandbox, proofs are HMAC-SHA256 signatures computed by the Mandate platform using a dedicated signing key.
+
+The payload that gets signed follows this format:
+
+```
+{agentId}:{mandateId}:{amount}:{currency}:{resource}:{nonce}:{timestamp}
+```
+
+For example:
+
+```
+agt_abc123:mnd_xyz789:0.10:USDC:https://api.example.com/data:nonce_8f3a:1736942400
+```
+
+The platform signs this string with `HMAC-SHA256` using its sandbox signing key and returns the signature as the proof value.
+
+**Replay protection** — Each proof includes a single-use `nonce`. The platform rejects any proof presented with a nonce it has already seen. Proofs are also time-bounded: they expire **5 minutes** after issuance. Presenting an expired proof returns a `401` from the seller's verification endpoint.
+
+| Sandbox | Production |
+|---|---|
+| Payment scheme: `kya-sandbox` | Payment scheme: `kya-usdc` |
+| Network: `sandbox` | Network: `base` |
+| Proof: HMAC-SHA256 signature | Proof: on-chain USDC verification |
+| No funds move | Real USDC on Base mainnet |
+
+## Generating a proof
+
+Call `POST /v1/payments/proof` to request a sandbox proof directly. In normal SDK usage the SDK does this for you, but you can call the endpoint manually to inspect the proof format or build a custom client.
+
+<CodeGroup>
+
+```bash Generate a proof
+curl -X POST https://api.kya.dev/v1/payments/proof \
+  -H "Authorization: Bearer $MANDATE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_id": "agt_xxx",
+    "mandate_id": "mnd_xxx",
+    "amount": "0.10",
+    "currency": "USDC",
+    "resource_url": "https://api.example.com/premium/data"
+  }'
+```
+
+```json Response
+{
+  "proof": {
+    "scheme": "kya-sandbox",
+    "network": "sandbox",
+    "agentId": "agt_xxx",
+    "mandateId": "mnd_xxx",
+    "amount": "0.10",
+    "currency": "USDC",
+    "resource": "https://api.example.com/premium/data",
+    "nonce": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "timestamp": "2025-01-15T10:00:00+00:00",
+    "signature": "a1b2c3d4e5f6..."
+  }
+}
+```
+
+</CodeGroup>
+
+## Verifying a proof
+
+Sellers call `POST /v1/payments/verify` to validate a proof presented by an agent. The endpoint checks the HMAC signature, confirms the nonce has not been used before, and verifies the proof has not expired.
+
+<CodeGroup>
+
+```bash Verify a proof
+curl -X POST https://api.kya.dev/v1/payments/verify \
+  -H "Authorization: Bearer $MANDATE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "proof": { "scheme": "kya-sandbox", "agentId": "agt_xxx", "mandateId": "mnd_xxx", "amount": "0.10", "currency": "USDC", "resource": "https://api.example.com/premium/data", "nonce": "f47ac10b-...", "timestamp": "2025-01-15T10:00:00+00:00", "signature": "a1b2c3d4..." },
+    "merchant_domain": "api.example.com",
+    "expected_amount": "0.10",
+    "expected_currency": "USDC"
+  }'
+```
+
+```json Approved response
+{
+  "verified": true,
+  "transaction_id": "txn_yyy"
+}
+```
+
+```json Rejected response (expired proof)
+{
+  "verified": false,
+  "reason": "proof_expired"
+}
+```
+
+```json Rejected response (replayed nonce)
+{
+  "verified": false,
+  "reason": "nonce_reused"
+}
+```
+
+</CodeGroup>
+
+<Warning>
+  Never use sandbox proofs in a production environment. The `kya-sandbox` payment scheme is rejected by any seller running production verification. Attempting to present a sandbox proof against a production endpoint results in a `402` rejection.
+</Warning>
+
+## Dashboard sandbox tester
+
+The Mandate dashboard includes a built-in sandbox tester under **Sandbox → Payment Tester**. Use it to:
+
+- Generate a proof for any agent and mandate without writing code
+- Verify a proof manually to inspect the decoded payload
+- Trigger deliberate policy denials (over-budget, expired mandate, blocked seller) to test your error handling
+- View the full audit log entry produced by each sandbox transaction
+
+The tester is useful for confirming your mandate configuration before wiring up the SDK.
+
+## Sandbox limitations
+
+The sandbox is a full functional simulation, but it has intentional constraints:
+
+- **No blockchain interaction** — Proofs are HMAC signatures, not on-chain transactions. The sandbox never touches Base or any other network.
+- **No real USDC** — Budget tracking in the sandbox counts simulated spend. Your real USDC balance is never affected.
+- **Sandbox keys are environment-scoped** — Agents and mandates created with a sandbox key are sandbox-only. You must re-register agents and re-create mandates with a production key before going live.
+- **Proof expiry is fixed at 5 minutes** — You cannot extend or disable proof expiry in the sandbox.
+
+<Note>
+  When you're ready to go live, switch your API key from `ky_sand_...` to a production key. The SDK and middleware detect the key prefix automatically and switch to the `kya-usdc` scheme on Base mainnet. Everything else in your integration stays the same.
+</Note>

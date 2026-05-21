@@ -1,0 +1,148 @@
+---
+title: "REST API Endpoints for Transactions"
+sidebarTitle: "Transactions"
+description: "Query transaction records for every payment attempt across your agents — filter by agent, mandate, or status to track spend and debug denials."
+---
+
+Transactions are created automatically by the policy engine and payment verification flow — you never create them directly. Each transaction captures the full context of a payment attempt: which agent requested it, which mandate governed it, which merchant received it, the amount and resource involved, and the final outcome. Use this endpoint to build dashboards, reconcile charges, or investigate policy decisions.
+
+---
+
+## List transactions
+
+<br />
+
+```
+GET /v1/transactions
+```
+
+Returns transactions for your account, ordered by creation date descending. Use query parameters to narrow results by agent, mandate, or status. Results are limited to 200 records per request — use repeated filtered queries to page through larger datasets.
+
+**Query parameters**
+
+<ParamField query="agent_id" type="string">
+  Filter to transactions initiated by this agent.
+</ParamField>
+
+<ParamField query="mandate_id" type="string">
+  Filter to transactions charged against this mandate.
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter by transaction status. One of: `pending`, `approved`, `denied`, `paid`, `failed`, `refunded`.
+</ParamField>
+
+<ParamField query="limit" type="number" default="50">
+  Maximum number of results to return. Minimum `1`, maximum `200`.
+</ParamField>
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.kya.dev/v1/transactions?agent_id=agent_abc123&status=paid&limit=25" \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••"
+```
+
+```typescript TypeScript
+const params = new URLSearchParams({
+  agent_id: "agent_abc123",
+  status: "paid",
+  limit: "25",
+});
+
+const res = await fetch(
+  `https://api.kya.dev/v1/transactions?${params}`,
+  {
+    headers: { Authorization: "Bearer ky_sand_••••••••••••••••" },
+  }
+);
+const { transactions } = await res.json();
+```
+
+</CodeGroup>
+
+**Response `200`**
+
+<ResponseField name="transactions" type="object[]" required>
+  Array of transaction objects, ordered by `created_at` descending.
+
+  <Expandable title="Transaction object fields">
+    <ResponseField name="id" type="string" required>
+      Unique transaction identifier.
+    </ResponseField>
+    <ResponseField name="agent_id" type="string" required>
+      The agent that initiated this transaction.
+    </ResponseField>
+    <ResponseField name="mandate_id" type="string" required>
+      The mandate governing this transaction.
+    </ResponseField>
+    <ResponseField name="amount" type="string" required>
+      Transaction amount as a decimal string.
+    </ResponseField>
+    <ResponseField name="currency" type="string" required>
+      Currency code, e.g. `"USDC"`.
+    </ResponseField>
+    <ResponseField name="resource_url" type="string" required>
+      The URL of the resource that was purchased or attempted.
+    </ResponseField>
+    <ResponseField name="resource_category" type="string">
+      Optional category label passed during policy evaluation, e.g. `"data"`.
+    </ResponseField>
+    <ResponseField name="status" type="string" required>
+      Transaction outcome. One of: `pending`, `approved`, `denied`, `paid`, `failed`, `refunded`.
+    </ResponseField>
+    <ResponseField name="sandbox" type="boolean" required>
+      `true` if this transaction was created under a sandbox API key.
+    </ResponseField>
+    <ResponseField name="created_at" type="string" required>
+      ISO 8601 creation timestamp.
+    </ResponseField>
+    <ResponseField name="updated_at" type="string" required>
+      ISO 8601 timestamp of the last status update.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+```json Example response
+{
+  "transactions": [
+    {
+      "id": "transaction_ghi789",
+      "agent_id": "agent_abc123",
+      "mandate_id": "mandate_xyz789",
+      "amount": "0.100000",
+      "currency": "USDC",
+      "resource_url": "https://api.example.com/data/companies/AAPL",
+      "resource_category": "data",
+      "status": "paid",
+      "sandbox": true,
+      "created_at": "2024-01-15T10:30:00Z",
+      "updated_at": "2024-01-15T10:30:01Z"
+    },
+    {
+      "id": "transaction_jkl012",
+      "agent_id": "agent_abc123",
+      "mandate_id": "mandate_xyz789",
+      "amount": "1.000000",
+      "currency": "USDC",
+      "resource_url": "https://api.example.com/data/companies/GOOG",
+      "resource_category": "data",
+      "status": "denied",
+      "sandbox": true,
+      "created_at": "2024-01-15T10:25:00Z",
+      "updated_at": "2024-01-15T10:25:00Z"
+    }
+  ]
+}
+```
+
+## Transaction statuses
+
+| Status    | Description                                                                                     |
+| --------- | ----------------------------------------------------------------------------------------------- |
+| `pending` | Policy evaluation is in progress. Short-lived — resolves to `approved` or `denied` immediately. |
+| `approved`| Policy approved the payment. Awaiting proof verification to transition to `paid`.               |
+| `denied`  | Policy rejected the payment. See the audit log for the `reason_code`.                           |
+| `paid`    | Payment proof was verified and the mandate budget has been charged.                             |
+| `failed`  | An unexpected error occurred during policy evaluation or verification.                          |
+| `refunded`| Reserved for future use.                                                                        |

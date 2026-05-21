@@ -1,0 +1,107 @@
+{
+  "projectType": "saas",
+  "projectName": "Mandate",
+  "projectDescription": "Mandate is the trust and policy enforcement layer for AI agent commerce — it decides whether an agent can be trusted to make a payment before any money moves.",
+  "theme": "luma",
+  "primaryColor": "#040404",
+  "lightColor": null,
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "sandbox"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/how-it-works",
+              "concepts/agents",
+              "concepts/mandates",
+              "concepts/policy-engine"
+            ]
+          },
+          {
+            "group": "Integration Guides",
+            "pages": [
+              "guides/agent-developer",
+              "guides/api-seller",
+              "guides/dashboard"
+            ]
+          },
+          {
+            "group": "SDKs",
+            "pages": [
+              "sdk/overview",
+              "sdk/middleware"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/authentication",
+              "api/errors"
+            ]
+          },
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api/agents",
+              "api/mandates",
+              "api/policy",
+              "api/payments",
+              "api/transactions",
+              "api/audit-log"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Agent identity registry with KYA (Know Your Agent) verification",
+    "Mandate-based spending policies with per-transaction and total budget limits",
+    "Real-time policy enforcement engine with 9 configurable checks",
+    "x402 payment protocol support with USDC on Base mainnet",
+    "Sandbox environment for testing payment flows end-to-end",
+    "Server-side middleware for Hono and Express (5-line integration)",
+    "TypeScript SDK for agent developers to handle 402 payment flows automatically",
+    "Transaction history and audit log with tamper-evident records",
+    "Dashboard for managing agents, mandates, merchants, and API keys"
+  ],
+  "publicApiSurface": [
+    "POST /v1/agents",
+    "GET /v1/agents",
+    "GET /v1/agents/{agent_id}",
+    "PATCH /v1/agents/{agent_id}/revoke",
+    "POST /v1/mandates",
+    "GET /v1/mandates",
+    "GET /v1/mandates/{mandate_id}",
+    "PATCH /v1/mandates/{mandate_id}/revoke",
+    "POST /v1/policy/evaluate",
+    "POST /v1/payments/proof",
+    "POST /v1/payments/verify",
+    "POST /v1/verify-agent",
+    "GET /v1/transactions",
+    "GET /v1/audit-log",
+    "POST /v1/accounts/api-keys",
+    "GET /v1/accounts/api-keys",
+    "DELETE /v1/accounts/api-keys/{key_id}",
+    "KyaPaymentsClient (TypeScript SDK)",
+    "KyaPaymentsClient.fetchWithPayment()",
+    "requireKyaPayment() (Hono middleware)",
+    "requireKyaPaymentExpress() (Express middleware)"
+  ]
+}

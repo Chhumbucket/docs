@@ -1,0 +1,136 @@
+---
+title: "How Mandate Works: x402 Payment Flow"
+description: "Understand the full x402 payment flow — from the initial 402 challenge to verified proof — and how Mandate sits between your agent and the seller."
+---
+
+When an agent tries to access a paid resource, Mandate enforces your spending policy before any payment leaves your account. Every transaction passes through a structured challenge-proof-verify cycle that keeps your agent, your mandate, and the seller in sync. This page walks through each step of that flow.
+
+## The full payment flow
+
+```
+Agent SDK                Seller API              Mandate Platform
+    │                        │                        │
+    │── GET /premium/data ──►│                        │
+    │◄── HTTP 402 ───────────│                        │
+    │    X-Payment-Challenge  │                        │
+    │                        │                        │
+    │── POST /v1/policy/evaluate ──────────────────►│
+    │◄── { decision: "approved" } ─────────────────│
+    │                        │                        │
+    │── POST /v1/payments/proof ───────────────────►│
+    │◄── { proof: { ... } } ───────────────────────│
+    │                        │                        │
+    │── GET /premium/data ──►│                        │
+    │   X-Payment-Proof       │── POST /v1/payments/verify ──►│
+    │                        │◄── { verified: true } ────────│
+    │◄── 200 + data ─────────│                        │
+```
+
+<Steps>
+  <Step title="Agent requests a paid endpoint">
+    Your agent makes a standard HTTP request to a seller's API endpoint — for example, `GET https://api.example.com/premium/data`. No special headers are needed at this point.
+  </Step>
+
+  <Step title="Seller returns HTTP 402 with a payment challenge">
+    The seller's API responds with `HTTP 402 Payment Required` and an `X-Payment-Challenge` header. The header value is a base64url-encoded JSON object that describes what the seller requires:
+
+    ```json
+    {
+      "x402Version": 1,
+      "accepts": [
+        {
+          "scheme": "kya-sandbox",
+          "network": "sandbox",
+          "amount": "0.10",
+          "currency": "USDC",
+          "address": "sandbox",
+          "resource": "https://api.example.com/premium/data"
+        }
+      ]
+    }
+    ```
+
+    The Mandate SDK parses this challenge automatically when you use `fetchWithPayment()`.
+  </Step>
+
+  <Step title="SDK calls POST /v1/policy/evaluate">
+    Before generating any proof, the SDK submits the payment request to Mandate's policy engine. Mandate checks the request against 9 rules — verifying your agent's status, mandate validity, merchant allowlist, category restrictions, per-transaction limit, and total budget.
+
+    ```bash
+    POST /v1/policy/evaluate
+    ```
+
+    ```json
+    {
+      "agent_id": "agt_abc123",
+      "mandate_id": "mnd_xyz789",
+      "merchant_domain": "api.example.com",
+      "amount": "0.10",
+      "currency": "USDC",
+      "resource_url": "https://api.example.com/premium/data",
+      "category": "data"
+    }
+    ```
+
+    If the payment is within policy, Mandate returns `{ "decision": "approved" }`. If any check fails, it returns `{ "decision": "denied" }` with a `reason_code` and the SDK throws a `PolicyDeniedError`. See [Policy engine](/concepts/policy-engine) for the full list of checks.
+  </Step>
+
+  <Step title="SDK calls POST /v1/payments/proof">
+    Once the policy engine approves the request, the SDK requests a signed payment proof from Mandate. In sandbox mode, this proof is an HMAC-SHA256 signature over the payment parameters. In production, this will be an on-chain payment on Base.
+
+    ```bash
+    POST /v1/payments/proof
+    ```
+
+    ```json
+    {
+      "agent_id": "agt_abc123",
+      "mandate_id": "mnd_xyz789",
+      "amount": "0.10",
+      "currency": "USDC",
+      "resource_url": "https://api.example.com/premium/data"
+    }
+    ```
+
+    Mandate returns a signed proof object that is valid for 5 minutes and can only be used once.
+  </Step>
+
+  <Step title="Agent retries the request with X-Payment-Proof">
+    The SDK retries the original request, this time attaching the signed proof in the `X-Payment-Proof` header. The header value is the base64url-encoded proof object.
+
+    ```http
+    GET /premium/data HTTP/1.1
+    Host: api.example.com
+    X-Payment-Proof: eyJhZ2VudElkIjoiYWd0X...
+    ```
+  </Step>
+
+  <Step title="Seller calls POST /v1/payments/verify">
+    The seller's middleware receives the request and calls Mandate to verify the proof. Mandate checks the timestamp (within a 5-minute window), validates the HMAC signature, confirms the amount and currency match, and ensures the nonce has not been used before. If valid, Mandate charges the mandate and records the transaction.
+
+    ```bash
+    POST /v1/payments/verify
+    ```
+
+    ```json
+    {
+      "proof": { "...": "..." },
+      "merchant_domain": "api.example.com",
+      "expected_amount": "0.10",
+      "expected_currency": "USDC"
+    }
+    ```
+
+    The seller receives `{ "verified": true }` and your mandate's `spent_total` is incremented atomically.
+  </Step>
+
+  <Step title="Seller returns 200 with the requested resource">
+    With proof verified, the seller fulfils the original request and returns `HTTP 200` with the data your agent requested. The full round-trip is complete.
+  </Step>
+</Steps>
+
+<Note>
+  **Sandbox vs. production behavior**
+
+  In sandbox mode (API keys prefixed `ky_sand_`), payment proofs are HMAC-SHA256 signatures generated by Mandate's signing key. No real money moves. In production, proofs will be on-chain USDC payments on Base mainnet — the verification step will confirm the on-chain transaction instead of the HMAC signature. The SDK and middleware interfaces remain identical between environments; only the key prefix changes.
+</Note>

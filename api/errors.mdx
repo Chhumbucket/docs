@@ -1,0 +1,95 @@
+---
+title: "Mandate API Error Reference"
+description: "Reference for Mandate's HTTP status codes and machine-readable error codes — understand every failure mode so you can handle them precisely in your code."
+---
+
+When a request fails, Mandate returns a JSON body describing what went wrong. You can rely on the HTTP status code for broad error classification and on the `error` or `detail` field for machine-readable error codes that are safe to branch on in your code.
+
+## Error response format
+
+Most endpoints return errors in this shape:
+
+```json
+{
+  "error": "mandate_expired",
+  "message": "Mandate status: revoked"
+}
+```
+
+Some endpoints — particularly those that raise FastAPI validation errors — return the `detail` key instead:
+
+```json
+{
+  "detail": "not_found"
+}
+```
+
+Your error-handling code should check both keys.
+
+## HTTP status codes
+
+| Status | Meaning                                                                  |
+| ------ | ------------------------------------------------------------------------ |
+| `200`  | Request succeeded.                                                        |
+| `201`  | Resource created successfully.                                            |
+| `400`  | Bad request — invalid input or an operation not permitted in this context.|
+| `401`  | Unauthorized — `Authorization` header missing or key invalid.             |
+| `402`  | Payment required — policy denied the transaction or proof was rejected.   |
+| `403`  | Forbidden — API key revoked, or agent/mandate unauthorized.               |
+| `404`  | Not found — resource does not exist or does not belong to your account.   |
+| `409`  | Conflict — resource already exists (e.g. duplicate account email).        |
+| `500`  | Internal server error — unexpected failure on Mandate's side.             |
+
+## Error codes
+
+| Error code                            | HTTP status | Description                                                                                      |
+| ------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------ |
+| `agent_revoked`                       | `402`       | The agent is not active. Revoked agents cannot authorize payments.                               |
+| `agent_not_found`                     | `404`       | The `agent_id` does not exist or does not belong to your account.                                |
+| `mandate_expired`                     | `402`       | The mandate is revoked, exhausted, or its `expires_at` timestamp has passed.                     |
+| `merchant_not_allowed`                | `402`       | The merchant domain or resource category is not in the mandate's allowlist.                      |
+| `amount_exceeds_per_transaction_limit`| `402`       | The requested amount exceeds the mandate's `max_spend_per_transaction` limit.                    |
+| `total_budget_exceeded`               | `402`       | The payment would push `spent_total` past the mandate's `max_spend_total` budget.                |
+| `payment_required`                    | `402`       | No payment proof was included in the request.                                                    |
+| `invalid_proof_header`                | `402`       | The `X-Payment-Proof` header is present but cannot be parsed.                                    |
+| `payment_verification_failed`         | `402`       | The proof signature is invalid or the nonce has already been consumed.                           |
+| `nonce_reused`                        | `400`       | The proof nonce has already been used. Proofs are single-use to prevent replay attacks.          |
+| `proof_expired`                       | `400`       | The proof timestamp is older than 5 minutes. Generate a fresh proof and retry.                   |
+| `invalid_signature`                   | `400`       | The HMAC-SHA256 signature in the proof does not match the expected value.                        |
+| `production_payments_not_supported`   | `400`       | You called a sandbox-only endpoint (e.g. `POST /v1/payments/proof`) with a production API key.   |
+| `developer_exists`                    | `409`       | An account with that email address is already registered.                                        |
+| `not_found`                           | `404`       | The requested resource does not exist.                                                           |
+
+## Handling errors in code
+
+Check the HTTP status code first, then inspect the error code for precise handling:
+
+```typescript TypeScript
+const res = await fetch("https://api.kya.dev/v1/policy/evaluate", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer ky_sand_••••••••••••••••",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ ... }),
+});
+
+if (!res.ok) {
+  const body = await res.json();
+  const code = body.error ?? body.detail;
+
+  switch (code) {
+    case "mandate_expired":
+      // prompt the user to renew or create a new mandate
+      break;
+    case "amount_exceeds_per_transaction_limit":
+      // reduce the requested amount or request a higher limit
+      break;
+    case "nonce_reused":
+      // generate a new proof and retry
+      break;
+    default:
+      throw new Error(`Mandate API error: ${code}`);
+  }
+}
+```

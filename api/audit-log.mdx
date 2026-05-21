@@ -1,0 +1,182 @@
+---
+title: "REST API Endpoints for the Audit Log"
+sidebarTitle: "Audit Log"
+description: "Query the append-only audit log that records every significant action taken on agents, mandates, transactions, and API keys in your account."
+---
+
+Every meaningful action in Mandate — creating an agent, evaluating a policy, verifying a payment, revoking a mandate — produces an immutable audit log event. The log is append-only: events are never updated or deleted. Use it to reconstruct exactly what happened, when, and by whom, whether you are debugging a failed payment or fulfilling a compliance requirement.
+
+---
+
+## List audit log events
+
+<br />
+
+```
+GET /v1/audit-log
+```
+
+Returns audit log events for your account, ordered by `created_at` descending. Filter by event type, resource type, or specific resource ID to narrow results. Up to 200 events are returned per request.
+
+<Note>
+  The audit log is append-only. Events cannot be modified or deleted. This guarantee is enforced at the database level — there is no API operation to alter historical records.
+</Note>
+
+**Query parameters**
+
+<ParamField query="event_type" type="string">
+  Filter to events of a specific type, e.g. `"mandate.created"` or `"transaction.paid"`. See the event types table below for all values.
+</ParamField>
+
+<ParamField query="resource_type" type="string">
+  Filter to events affecting a specific resource type. One of: `agent`, `mandate`, `transaction`, `api_key`, `policy_decision`.
+</ParamField>
+
+<ParamField query="resource_id" type="string">
+  Filter to events affecting a specific resource, e.g. `"mandate_xyz789"`. Combine with `resource_type` for precise lookups.
+</ParamField>
+
+<ParamField query="limit" type="number" default="50">
+  Maximum number of events to return. Minimum `1`, maximum `200`.
+</ParamField>
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.kya.dev/v1/audit-log?resource_type=mandate&resource_id=mandate_xyz789&limit=10" \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••"
+```
+
+```typescript TypeScript
+const params = new URLSearchParams({
+  resource_type: "mandate",
+  resource_id: "mandate_xyz789",
+  limit: "10",
+});
+
+const res = await fetch(
+  `https://api.kya.dev/v1/audit-log?${params}`,
+  {
+    headers: { Authorization: "Bearer ky_sand_••••••••••••••••" },
+  }
+);
+const { events } = await res.json();
+```
+
+</CodeGroup>
+
+**Response `200`**
+
+<ResponseField name="events" type="object[]" required>
+  Array of audit log event objects, ordered by `created_at` descending.
+
+  <Expandable title="Event object fields">
+    <ResponseField name="id" type="string" required>
+      Unique event identifier.
+    </ResponseField>
+    <ResponseField name="developer_id" type="string" required>
+      Your account ID.
+    </ResponseField>
+    <ResponseField name="actor_type" type="string" required>
+      Who performed the action. One of: `"developer"`, `"agent"`, `"system"`, `"merchant"`.
+    </ResponseField>
+    <ResponseField name="actor_id" type="string" required>
+      The ID of the actor. For developer actions this is your account ID; for system actions it is `"system"`.
+    </ResponseField>
+    <ResponseField name="event_type" type="string" required>
+      Dot-separated event identifier, e.g. `"mandate.created"`. See the event types table below.
+    </ResponseField>
+    <ResponseField name="resource_type" type="string" required>
+      The type of resource this event affects, e.g. `"mandate"`, `"agent"`.
+    </ResponseField>
+    <ResponseField name="resource_id" type="string" required>
+      The ID of the specific resource this event affects.
+    </ResponseField>
+    <ResponseField name="metadata" type="object" required>
+      Structured key-value pairs providing event-specific context. Content varies by event type.
+    </ResponseField>
+    <ResponseField name="sandbox" type="boolean" required>
+      `true` if this event was recorded under a sandbox API key.
+    </ResponseField>
+    <ResponseField name="created_at" type="string" required>
+      ISO 8601 timestamp when the event was recorded.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+```json Example response
+{
+  "events": [
+    {
+      "id": "evt_abc001",
+      "developer_id": "dev_000111",
+      "actor_type": "agent",
+      "actor_id": "agent_abc123",
+      "event_type": "transaction.paid",
+      "resource_type": "transaction",
+      "resource_id": "transaction_ghi789",
+      "metadata": {
+        "amount": "0.10",
+        "currency": "USDC",
+        "merchant_domain": "api.example.com"
+      },
+      "sandbox": true,
+      "created_at": "2024-01-15T10:30:01Z"
+    },
+    {
+      "id": "evt_abc000",
+      "developer_id": "dev_000111",
+      "actor_type": "system",
+      "actor_id": "system",
+      "event_type": "policy.evaluated",
+      "resource_type": "policy_decision",
+      "resource_id": "policy_decision_mno345",
+      "metadata": {
+        "decision": "approved",
+        "reason_code": "within_policy",
+        "transaction_id": "transaction_ghi789"
+      },
+      "sandbox": true,
+      "created_at": "2024-01-15T10:30:00Z"
+    }
+  ]
+}
+```
+
+---
+
+## Event types
+
+| Event type                | Actor       | Description                                                          |
+| ------------------------- | ----------- | -------------------------------------------------------------------- |
+| `agent.created`           | `developer` | A new agent was registered.                                          |
+| `agent.revoked`           | `developer` | An agent was permanently revoked.                                    |
+| `mandate.created`         | `developer` | A new mandate was created.                                           |
+| `mandate.revoked`         | `developer` | A mandate was revoked.                                               |
+| `api_key.created`         | `developer` / `system` | An API key was created (including on account registration). |
+| `api_key.revoked`         | `developer` | An API key was revoked.                                              |
+| `policy.evaluated`        | `system`    | The policy engine evaluated a payment request and recorded a decision.|
+| `verification.completed`  | `system`    | A `/v1/verify-agent` check completed successfully.                   |
+| `transaction.paid`        | `agent`     | A payment proof was verified and the mandate was charged.            |
+
+## Common audit patterns
+
+**Reconstruct all events for a mandate**
+
+```bash
+GET /v1/audit-log?resource_type=mandate&resource_id=mandate_xyz789
+```
+
+**Find all paid transactions by an agent**
+
+```bash
+GET /v1/audit-log?event_type=transaction.paid&resource_type=transaction
+```
+
+Then cross-reference `metadata.agent_id` in the results, or use `GET /v1/transactions?agent_id=agent_abc123&status=paid` for a direct transaction query.
+
+**Review all API key activity**
+
+```bash
+GET /v1/audit-log?resource_type=api_key
+```

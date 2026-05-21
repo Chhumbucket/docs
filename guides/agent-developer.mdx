@@ -1,0 +1,130 @@
+---
+title: 'Build an AI Agent That Pays for APIs'
+description: 'Use the Mandate TypeScript SDK to make policy-checked, proof-signed API calls from your AI agent — with typed error handling for every denial reason.'
+---
+
+The `@mandate/sdk` package gives your AI agent everything it needs to call payment-gated APIs without storing credentials or managing payment state. You provide an agent ID and mandate ID; Mandate handles the challenge–proof–retry flow transparently. If the policy denies the transaction, you get a typed error with a machine-readable reason code.
+
+## Install the SDK
+
+```bash
+npm install @mandate/sdk
+```
+
+## Initialize the client
+
+```typescript
+import { KyaPaymentsClient } from '@mandate/sdk'
+
+const mandate = new KyaPaymentsClient({
+  apiKey: process.env.MANDATE_API_KEY,  // ky_sand_... for sandbox
+  baseUrl: process.env.MANDATE_API_URL, // optional, defaults to https://api.kya.dev
+})
+```
+
+The client exposes a `sandbox` boolean that is `true` when your API key starts with `ky_sand_`. You can use this to gate behavior in your agent:
+
+```typescript
+if (mandate.sandbox) {
+  console.log('Running in sandbox mode — no real charges')
+}
+```
+
+## Make a paid API call
+
+Pass the target URL and your agent and mandate identifiers to `fetchWithPayment`. The method, extra headers, and body are all optional.
+
+```typescript
+import { KyaPaymentsClient, PolicyDeniedError, PaymentFailedError } from '@mandate/sdk'
+
+try {
+  const response = await mandate.fetchWithPayment(
+    'https://api.example.com/premium/data',
+    {
+      agentId: 'agt_xxx',
+      mandateId: 'mnd_xxx',
+      method: 'GET',   // optional, defaults to GET
+      headers: {},     // optional extra headers
+    }
+  )
+  const data = await response.json()
+} catch (error) {
+  if (error instanceof PolicyDeniedError) {
+    console.error('Payment denied:', error.reason_code, error.detail)
+  } else if (error instanceof PaymentFailedError) {
+    console.error('Payment failed:', error.message)
+  }
+}
+```
+
+<Warning>
+Each `fetchWithPayment` call may charge the mandate if the policy approves it. Make sure the agent ID and mandate ID you supply are correct before calling paid endpoints.
+</Warning>
+
+## What happens under the hood
+
+You do not need to implement any of this — `fetchWithPayment` handles it for you. Understanding the flow helps with debugging:
+
+1. The SDK makes an initial request to the target URL without any payment headers.
+2. If the endpoint returns **200**, the response is returned immediately — the endpoint is free.
+3. If the endpoint returns **402**, the SDK parses the payment challenge from the `X-Payment-Challenge` header.
+4. The SDK calls `POST /v1/policy/evaluate` on the Mandate API with your agent ID, mandate ID, merchant domain, amount, and currency. If the policy denies the transaction, `PolicyDeniedError` is thrown immediately and no payment is made.
+5. If the policy approves, the SDK calls `POST /v1/payments/proof` to obtain a signed payment proof.
+6. The SDK retries the original request with the `X-Payment-Proof` header attached.
+7. If the retry returns another 402, `PaymentFailedError` is thrown.
+
+Your agent never stores or manages payment credentials at any point in this flow.
+
+<Tip>
+Call `POST /v1/verify-agent` before making an actual paid request to run a pre-flight policy check. It runs the same checks as the policy engine but does not create a transaction or charge the mandate — useful for surfacing configuration problems early.
+</Tip>
+
+## Error handling
+
+All SDK errors extend `KyaError`. Catch the specific subclasses to handle different failure modes:
+
+| Class | When it is thrown | Key properties |
+|---|---|---|
+| `PolicyDeniedError` | The policy engine returns `denied` | `reason_code`, `detail`, `code` |
+| `PaymentFailedError` | Payment verification fails or a network error occurs | `message`, `code` |
+| `KyaError` | Base class — catch this to handle any SDK error | `message`, `code` |
+
+### `PolicyDeniedError` reason codes
+
+| `reason_code` | Meaning |
+|---|---|
+| `agent_revoked` | The agent does not exist or has been revoked |
+| `mandate_expired` | The mandate does not exist, is revoked, or has expired |
+| `merchant_not_allowed` | The target domain is not in the mandate's merchant allowlist |
+| `amount_exceeds_per_transaction_limit` | The requested amount exceeds the per-transaction limit on the mandate |
+| `total_budget_exceeded` | The charge would push the mandate's total spend over its budget |
+
+```typescript
+import { PolicyDeniedError } from '@mandate/sdk'
+
+try {
+  await mandate.fetchWithPayment(url, options)
+} catch (error) {
+  if (error instanceof PolicyDeniedError) {
+    switch (error.reason_code) {
+      case 'mandate_expired':
+        // Notify the user or operator to renew the mandate
+        break
+      case 'total_budget_exceeded':
+        // Stop making calls for this mandate — the budget is exhausted
+        break
+      default:
+        console.error('Policy denied:', error.reason_code, error.detail)
+    }
+  }
+}
+```
+
+## Environment variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `MANDATE_API_KEY` | Yes | Your sandbox (`ky_sand_...`) or production API key |
+| `MANDATE_API_URL` | No | Mandate API base URL; defaults to `https://api.kya.dev` |
+
+You can also pass `apiKey` and `baseUrl` directly to the `KyaPaymentsClient` constructor if you prefer not to use environment variables.

@@ -1,0 +1,85 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Mandate",
+  "theme": "luma",
+  "favicon": "/images/mandate.png",
+  "logo": {
+    "light": "/images/mandate.png",
+    "dark": "/images/mandate-black.png"
+  },
+  "colors": {
+    "primary": "#040404",
+    "light": "#F7F4EF",
+    "dark": "#B45309"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/morganfung/mandate"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "sandbox"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/how-it-works",
+              "concepts/agents",
+              "concepts/mandates",
+              "concepts/policy-engine"
+            ]
+          },
+          {
+            "group": "Integration Guides",
+            "pages": [
+              "guides/agent-developer",
+              "guides/api-seller",
+              "guides/dashboard"
+            ]
+          },
+          {
+            "group": "SDKs",
+            "pages": [
+              "sdk/overview",
+              "sdk/middleware"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/authentication",
+              "api/errors"
+            ]
+          },
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api/agents",
+              "api/mandates",
+              "api/policy",
+              "api/payments",
+              "api/transactions",
+              "api/audit-log"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

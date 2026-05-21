@@ -1,0 +1,92 @@
+---
+title: "Mandates: Spending Policies for AI Agents"
+description: "Define what your AI agent is allowed to spend, where it can spend it, and for how long — by attaching a mandate to a registered agent."
+---
+
+A mandate is a spending policy attached to a specific agent. It answers the question every seller needs answered before accepting a payment: is this agent authorised to pay for this resource right now, and within what limits? Every payment Mandate approves is evaluated against a mandate — no mandate means no payment. You can create multiple mandates for the same agent to scope permissions by purpose, time period, or merchant.
+
+## Mandate fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `agent_id` | string | Yes | The ID of the agent this mandate governs (`agt_xxx`). The mandate is permanently bound to this agent. |
+| `purpose` | string | Yes | Human-readable description of why this agent needs to spend. Appears in the audit log and dashboard. |
+| `max_spend_total` | string | Yes | Lifetime budget cap as a decimal string (e.g., `"50.00"`). The mandate transitions to `exhausted` when this amount is reached. Denominated in `currency`. |
+| `max_spend_per_transaction` | string | Yes | Maximum amount allowed per individual payment (e.g., `"1.00"`). The policy engine denies any transaction that exceeds this limit. |
+| `currency` | string | No | Currency for all amounts. Defaults to `"USDC"`. |
+| `allowed_sellers` | string[] | No | List of merchant domains the agent is allowed to pay (e.g., `["api.example.com", "data.acme.io"]`). Pass `["*"]` to allow any seller. An empty array blocks all merchants — you must supply at least one domain or `["*"]`. |
+| `allowed_categories` | string[] | No | List of resource categories the agent is allowed to purchase (e.g., `["data", "compute"]`). Defaults to empty array — see the note below. |
+| `expires_at` | string | Yes | ISO 8601 datetime after which the mandate is no longer valid (e.g., `"2026-01-01T00:00:00Z"`). |
+
+## Mandate statuses
+
+- **`active`** — the mandate is valid and the policy engine will evaluate payments against it.
+- **`revoked`** — manually disabled. The policy engine returns `reason_code: "mandate_expired"` for any payment that references a revoked mandate.
+- **`exhausted`** — `spent_total` has reached `max_spend_total`. The database transitions the mandate to this status automatically when the final payment is charged. The policy engine treats exhausted mandates the same as expired ones.
+
+## Creating a mandate
+
+```bash
+POST /v1/mandates
+```
+
+```json
+{
+  "agent_id": "agt_01j9k2m3p4q5r6s7t8u9v0w1x",
+  "purpose": "Fetch company filings and news for investment research",
+  "max_spend_total": "50.00",
+  "max_spend_per_transaction": "1.00",
+  "currency": "USDC",
+  "allowed_sellers": ["api.sec.gov", "newsapi.example.com"],
+  "allowed_categories": ["data", "filings"],
+  "expires_at": "2026-01-01T00:00:00Z"
+}
+```
+
+**Response (`201 Created`):**
+
+```json
+{
+  "id": "mnd_02k3l4n5o6p7q8r9s0t1u2v3y",
+  "agent_id": "agt_01j9k2m3p4q5r6s7t8u9v0w1x",
+  "purpose": "Fetch company filings and news for investment research",
+  "max_spend_total": "50.00",
+  "max_spend_per_transaction": "1.00",
+  "spent_total": "0.00",
+  "currency": "USDC",
+  "allowed_sellers": ["api.sec.gov", "newsapi.example.com"],
+  "allowed_categories": ["data", "filings"],
+  "expires_at": "2026-01-01T00:00:00Z",
+  "status": "active",
+  "created_at": "2025-10-14T09:00:00.000Z",
+  "revoked_at": null
+}
+```
+
+## Revoking a mandate
+
+```bash
+PATCH /v1/mandates/{mandate_id}/revoke
+```
+
+No request body is required. The response returns the updated mandate object with `status: "revoked"`.
+
+<Warning>
+  Revoking a mandate takes effect immediately. Any ongoing agent activity that relies on this mandate will be blocked at the next policy evaluation. If the agent has already received a payment proof but has not yet presented it to the seller, the seller's call to `POST /v1/payments/verify` will still succeed — verification does not re-run policy checks. Revoke with care when agent activity is in progress.
+</Warning>
+
+## Important design notes
+
+<Note>
+  **`allowed_categories: []` means all categories are allowed — not zero.**
+
+  An empty `allowed_categories` array is a wildcard: the policy engine skips the category check entirely if the array is empty. To restrict an agent to specific categories, you must explicitly list them (e.g., `["data", "compute"]`). This behaviour is intentional — a mandate with no category list is a general-purpose mandate.
+</Note>
+
+### One mandate per purpose
+
+A mandate belongs to exactly one agent and cannot be transferred. For agents that need to access multiple sellers for unrelated purposes — for example, one mandate for market data and another for compute — create separate mandates. This keeps your audit trail clean and lets you revoke one capability without affecting the other.
+
+### Budget is lifetime, not rolling
+
+`max_spend_total` is a lifetime cap tracked by `spent_total`. There is no automatic reset. Once a mandate is exhausted, you must create a new mandate to continue authorising payments for that agent.

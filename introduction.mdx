@@ -1,0 +1,70 @@
+---
+title: "Mandate: Trust Layer for AI Agent Payments"
+description: "Mandate is the trust and policy enforcement layer for AI agent commerce — verifying agent identity and enforcing spending policy before any USDC moves."
+---
+
+Mandate answers a single question that every paid API must ask before accepting a payment from an autonomous agent: *can this agent be trusted to make this transaction right now?* It sits between your agent and the x402 payment protocol, verifying identity, evaluating spending policy in real time, and issuing cryptographic proofs that sellers can independently verify — all before any money moves.
+
+<Info>
+  Mandate does not hold funds, run a wallet, or touch the payment rail. x402 moves money. Mandate decides whether it should.
+</Info>
+
+## The problem Mandate solves
+
+AI agents are increasingly autonomous. They browse APIs, select services, and initiate purchases — without a human in the loop. The x402 protocol (pioneered by Coinbase) and the AP2 mandate standard (from Google) have standardized *how* agents pay and *what* a spending policy looks like. Neither standard answers:
+
+- **Who is this agent?** Is the developer behind it legitimate? Is the agent active or revoked?
+- **Is this transaction within policy?** Does it exceed per-transaction limits? Has the monthly budget been exhausted?
+- **Is the seller allowed?** Is this merchant on the agent's allowlist? Is the resource category permitted?
+
+Mandate enforces all of these checks in real time, for every payment attempt.
+
+## Two personas, one platform
+
+<CardGroup cols={2}>
+  <Card title="Agent developers" icon="code" href="/guides/agent-developer">
+    You're building an AI agent that calls paid APIs. Install `@mandate/sdk`, register your agent, attach a mandate, and the SDK handles the full x402 challenge–proof flow automatically.
+  </Card>
+  <Card title="API sellers" icon="shield-check" href="/guides/api-seller">
+    You're selling access to an API. Add `requireKyaPayment()` middleware to any endpoint and it issues the 402 challenge, verifies the proof, and extracts the paying agent's ID — in five lines of code.
+  </Card>
+</CardGroup>
+
+## The x402 payment flow
+
+When your agent calls a Mandate-protected endpoint, the following sequence runs automatically:
+
+1. **HTTP 402 challenge** — The seller's API returns a `402 Payment Required` response with a signed challenge describing the price, currency, and accepted payment schemes.
+2. **Policy check** — The SDK sends the transaction details to Mandate's policy engine (`POST /v1/policy/evaluate`). The engine runs up to nine checks: agent status, mandate validity, merchant allowlist, category filter, per-transaction limit, total budget, and more.
+3. **Proof issuance** — If the policy engine approves, Mandate issues a cryptographic payment proof (`POST /v1/payments/proof`) signed with its platform key.
+4. **Payment** — The SDK retries the original request with the proof in the `X-Payment-Proof` header. The seller verifies the proof against Mandate and returns the resource.
+
+<Note>
+  In sandbox mode, proofs are HMAC-SHA256 signatures — no real USDC moves. In production, proofs represent verified on-chain payments in USDC on Base.
+</Note>
+
+## Key concepts
+
+| Concept | What it is |
+|---|---|
+| **Agent** | A registered identity for your AI agent. Every agent gets a stable `agent_id` (format: `agt_xxx`) that sellers can verify. |
+| **Mandate** | A spending policy attached to an agent. Sets per-transaction limits, total budgets, allowed merchants, allowed categories, and an expiration date. |
+| **Policy engine** | The real-time decision engine that runs every payment attempt through up to nine checks before issuing or denying a proof. |
+| **Sandbox** | A full simulation of the payment flow using HMAC-signed proofs instead of real USDC. Use sandbox keys (`ky_sand_...`) for development and testing. |
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Go from zero to your first sandbox payment in five steps.
+  </Card>
+  <Card title="Agent developer guide" icon="terminal" href="/guides/agent-developer">
+    Full walkthrough for building an agent that pays for APIs with Mandate.
+  </Card>
+  <Card title="API seller guide" icon="plug" href="/guides/api-seller">
+    Protect your endpoints with `requireKyaPayment()` middleware.
+  </Card>
+  <Card title="API reference" icon="brackets-curly" href="/api/authentication">
+    Full REST API reference for agents, mandates, policy, and payments.
+  </Card>
+</CardGroup>

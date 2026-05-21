@@ -1,0 +1,227 @@
+---
+title: 'Mandate TypeScript SDK Reference'
+sidebarTitle: 'SDK Reference'
+description: 'Install @mandate/sdk to give your AI agent a single method — fetchWithPayment — that handles the full x402 payment flow automatically.'
+---
+
+The `@mandate/sdk` package gives your TypeScript agent a single method — `fetchWithPayment` — that transparently handles the full 402 payment flow: it checks the mandate policy, requests a cryptographic proof from Mandate, and retries the original request with the signed proof attached. You keep your business logic; the SDK handles the payment handshake.
+
+## Installation
+
+```bash
+npm install @mandate/sdk
+```
+
+## KyaPaymentsClient
+
+`KyaPaymentsClient` is the main entry point. Construct it once and reuse it across requests.
+
+```typescript
+import { KyaPaymentsClient } from '@mandate/sdk'
+
+const client = new KyaPaymentsClient({
+  apiKey: process.env.MANDATE_API_KEY!,
+})
+```
+
+### Constructor options
+
+`KyaPaymentsClientOptions`
+
+<ParamField body="apiKey" type="string" required>
+  Your Mandate API key. Keys that start with `ky_sand_` activate sandbox mode.
+</ParamField>
+
+<ParamField body="baseUrl" type="string">
+  Mandate API base URL. Defaults to `https://api.kya.dev`.
+</ParamField>
+
+### Instance properties
+
+| Property  | Type      | Description                                              |
+| --------- | --------- | -------------------------------------------------------- |
+| `sandbox` | `boolean` | `true` when the API key starts with `ky_sand_`. Read-only. |
+
+---
+
+## fetchWithPayment(url, options)
+
+Makes an HTTP request to `url`, automatically handling a 402 payment challenge if the server requires payment.
+
+```typescript
+const response = await client.fetchWithPayment(
+  'https://api.example.com/premium/data',
+  { agentId, mandateId }
+)
+```
+
+### Options
+
+`FetchWithPaymentOptions`
+
+<ParamField body="agentId" type="string" required>
+  The ID of the agent making the payment.
+</ParamField>
+
+<ParamField body="mandateId" type="string" required>
+  The mandate that authorizes this payment.
+</ParamField>
+
+<ParamField body="method" type="string">
+  HTTP method. Defaults to `'GET'`.
+</ParamField>
+
+<ParamField body="headers" type="Record<string, string>">
+  Additional request headers to include on both the initial and retried request.
+</ParamField>
+
+<ParamField body="body" type="string">
+  Request body, forwarded on both the initial and retried request.
+</ParamField>
+
+### Returns
+
+`Promise<Response>` — the final HTTP response from the target server.
+
+### Request flow
+
+<Steps>
+  <Step title="Initial request">
+    Sends the request to `url` with a `Content-Type: application/json` header and any headers you supply.
+  </Step>
+  <Step title="Non-402 response">
+    If the status is anything other than 402, returns the response immediately with no payment processing.
+  </Step>
+  <Step title="Parse the challenge">
+    Reads and base64url-decodes the `X-Payment-Challenge` header. Throws `PaymentChallengeError` if the header is absent or malformed.
+  </Step>
+  <Step title="Evaluate policy">
+    Calls `POST /v1/policy/evaluate` with the agent ID, mandate ID, merchant domain, amount, currency, and resource URL. Throws `PolicyDeniedError` if the decision is `"denied"`, or `PaymentFailedError` if the HTTP call itself fails.
+  </Step>
+  <Step title="Request a payment proof">
+    Calls `POST /v1/payments/proof` to obtain a signed `PaymentProof`. Throws `PaymentFailedError` if proof generation fails.
+  </Step>
+  <Step title="Retried request">
+    Resends the original request with three additional headers: `X-Payment-Proof`, `X-Kya-Agent-Id`, and `X-Kya-Mandate-Id`.
+  </Step>
+  <Step title="Final response">
+    Returns the server's response. If the server still returns 402, throws `PaymentFailedError` with the server's `reason` field.
+  </Step>
+</Steps>
+
+---
+
+## Error classes
+
+All error classes are exported from `@mandate/sdk`.
+
+### KyaError
+
+Base class for all Mandate SDK errors. Extends the native `Error`.
+
+| Property | Type     | Description                         |
+| -------- | -------- | ----------------------------------- |
+| `code`   | `string` | Machine-readable error code string. |
+
+### PolicyDeniedError
+
+Thrown when `POST /v1/policy/evaluate` returns `decision: "denied"`. Extends `KyaError` with `code: "policy_denied"`.
+
+| Property      | Type         | Description                                    |
+| ------------- | ------------ | ---------------------------------------------- |
+| `reason_code` | `ReasonCode` | Why the payment was denied. See codes below.   |
+| `detail`      | `string`     | Optional human-readable explanation from Mandate. |
+
+**Reason codes**
+
+| Code                              | Meaning                                              |
+| --------------------------------- | ---------------------------------------------------- |
+| `agent_revoked`                   | The agent's access has been revoked.                 |
+| `mandate_expired`                 | The mandate is no longer valid.                      |
+| `merchant_not_allowed`            | The merchant is not on the mandate's allow-list.     |
+| `amount_exceeds_per_transaction_limit` | The charge exceeds the per-transaction cap.     |
+| `total_budget_exceeded`           | The mandate's total spend budget has been reached.   |
+
+### PaymentFailedError
+
+Thrown when payment processing itself fails — for example, if proof generation returns an error or the seller rejects the proof. Extends `KyaError` with `code: "payment_failed"`.
+
+### PaymentChallengeError
+
+Thrown when the `X-Payment-Challenge` header is missing or cannot be decoded. Extends `KyaError` with `code: "challenge_parse_error"`.
+
+---
+
+## Lower-level exports
+
+These functions are exported for advanced use cases such as building custom payment flows or server-side challenge generation.
+
+| Export | Signature | Description |
+| ------ | --------- | ----------- |
+| `parsePaymentChallenge` | `(response: Response) => PaymentChallenge` | Reads and validates the `X-Payment-Challenge` header from a 402 response. |
+| `buildPaymentChallenge` | `(options) => PaymentChallenge` | Constructs a `PaymentChallenge` object from amount, currency, and resource. |
+| `encodeChallengeHeader` | `(challenge: PaymentChallenge) => string` | Base64url-encodes a challenge for use in the `X-Payment-Challenge` header. |
+| `buildProof` | `(options) => Promise<PaymentProof>` | Calls `POST /v1/payments/proof` and returns a validated `PaymentProof`. |
+| `encodeProofHeader` | `(proof: PaymentProof) => string` | Base64url-encodes a proof for use in the `X-Payment-Proof` header. |
+
+### buildPaymentChallenge options
+
+| Option     | Type     | Required | Description                                               |
+| ---------- | -------- | -------- | --------------------------------------------------------- |
+| `amount`   | `string` | Yes      | Amount to charge, e.g. `"0.10"`.                         |
+| `currency` | `string` | Yes      | Payment currency, e.g. `"USDC"`.                         |
+| `resource` | `string` | Yes      | Full URL of the resource being accessed.                  |
+| `scheme`   | `string` | No       | Payment scheme. Defaults to `"kya-sandbox"`.              |
+| `network`  | `string` | No       | Chain/network identifier. Defaults to `"sandbox"`.        |
+
+### buildProof options
+
+| Option       | Type               | Required | Description                               |
+| ------------ | ------------------ | -------- | ----------------------------------------- |
+| `agentId`    | `string`           | Yes      | ID of the paying agent.                   |
+| `mandateId`  | `string`           | Yes      | ID of the authorizing mandate.            |
+| `challenge`  | `PaymentChallenge` | Yes      | Challenge parsed from the 402 response.   |
+| `apiKey`     | `string`           | Yes      | Your Mandate API key.                     |
+| `apiUrl`     | `string`           | Yes      | Mandate API base URL.                     |
+
+---
+
+## Full example
+
+```typescript
+import {
+  KyaPaymentsClient,
+  PolicyDeniedError,
+  PaymentFailedError,
+} from '@mandate/sdk'
+
+const client = new KyaPaymentsClient({
+  apiKey: process.env.MANDATE_API_KEY!,
+})
+
+async function fetchPremiumData(agentId: string, mandateId: string) {
+  try {
+    const response = await client.fetchWithPayment(
+      'https://api.example.com/premium/data',
+      { agentId, mandateId }
+    )
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    if (error instanceof PolicyDeniedError) {
+      console.error(`Payment denied [${error.reason_code}]: ${error.message}`)
+
+      if (error.reason_code === 'mandate_expired') {
+        // Prompt the user to renew the mandate
+      }
+    } else if (error instanceof PaymentFailedError) {
+      console.error('Payment processing failed:', error.message)
+    }
+    throw error
+  }
+}
+```

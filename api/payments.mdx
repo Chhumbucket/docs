@@ -1,0 +1,277 @@
+---
+title: "REST API Endpoints for Payments"
+sidebarTitle: "Payments"
+description: "Generate sandbox payment proofs and verify them against a mandate to record a charge — the core of Mandate's payment authorization flow."
+---
+
+Mandate uses a cryptographically signed proof-of-payment model. An agent generates a proof asserting its identity, the mandate it is drawing from, and the amount it intends to pay. A merchant verifies that proof and, once valid, the charge is recorded against the mandate's budget. These two endpoints implement both sides of that handshake in the sandbox environment.
+
+---
+
+## Generate a sandbox proof
+
+<br />
+
+```
+POST /v1/payments/proof
+```
+
+Generates a signed payment proof that an agent can present to a merchant. The proof is an HMAC-SHA256 signed payload that binds together the agent identity, mandate, amount, resource URL, a unique nonce, and a timestamp.
+
+<Warning>
+  This endpoint is **sandbox only**. Calling it with a production API key returns `400 production_payments_not_supported`. Production payment proof generation is handled by the on-chain payment layer.
+</Warning>
+
+**Request body**
+
+<ParamField body="agent_id" type="string" required>
+  The agent generating this proof.
+</ParamField>
+
+<ParamField body="mandate_id" type="string" required>
+  The mandate the agent is drawing from.
+</ParamField>
+
+<ParamField body="amount" type="string" required>
+  The payment amount as a decimal string, e.g. `"0.10"`. Must exactly match the `expected_amount` when the proof is verified.
+</ParamField>
+
+<ParamField body="currency" type="string" default="USDC">
+  The currency for this proof. Currently `"USDC"` only.
+</ParamField>
+
+<ParamField body="resource_url" type="string" required>
+  The URL of the resource being purchased.
+</ParamField>
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST https://api.kya.dev/v1/payments/proof \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "agent_id": "agent_abc123",
+    "mandate_id": "mandate_xyz789",
+    "amount": "0.10",
+    "currency": "USDC",
+    "resource_url": "https://api.example.com/data/companies/AAPL"
+  }'
+```
+
+```typescript TypeScript
+const res = await fetch("https://api.kya.dev/v1/payments/proof", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer ky_sand_••••••••••••••••",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    agent_id: "agent_abc123",
+    mandate_id: "mandate_xyz789",
+    amount: "0.10",
+    currency: "USDC",
+    resource_url: "https://api.example.com/data/companies/AAPL",
+  }),
+});
+const { proof } = await res.json();
+```
+
+</CodeGroup>
+
+**Response `201`**
+
+<ResponseField name="proof" type="object" required>
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="scheme" type="string" required>
+      Always `"kya-sandbox"` for sandbox proofs.
+    </ResponseField>
+    <ResponseField name="network" type="string" required>
+      Always `"sandbox"` for sandbox proofs.
+    </ResponseField>
+    <ResponseField name="agentId" type="string" required>
+      The agent ID from the request.
+    </ResponseField>
+    <ResponseField name="mandateId" type="string" required>
+      The mandate ID from the request.
+    </ResponseField>
+    <ResponseField name="amount" type="string" required>
+      The payment amount as a decimal string.
+    </ResponseField>
+    <ResponseField name="currency" type="string" required>
+      The currency code.
+    </ResponseField>
+    <ResponseField name="resource" type="string" required>
+      The resource URL from the request.
+    </ResponseField>
+    <ResponseField name="nonce" type="string" required>
+      A UUID v4 nonce. Single-use — replay protection is enforced at verification time.
+    </ResponseField>
+    <ResponseField name="timestamp" type="string" required>
+      ISO 8601 timestamp when the proof was generated. Proofs are valid for 5 minutes.
+    </ResponseField>
+    <ResponseField name="signature" type="string" required>
+      HMAC-SHA256 hex signature over `{agentId}:{mandateId}:{amount}:{currency}:{resource}:{nonce}:{timestamp}`.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+```json Example response
+{
+  "proof": {
+    "scheme": "kya-sandbox",
+    "network": "sandbox",
+    "agentId": "agent_abc123",
+    "mandateId": "mandate_xyz789",
+    "amount": "0.10",
+    "currency": "USDC",
+    "resource": "https://api.example.com/data/companies/AAPL",
+    "nonce": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "timestamp": "2024-01-15T10:30:00+00:00",
+    "signature": "a1b2c3d4e5f6..."
+  }
+}
+```
+
+**Error responses**
+
+| Status | Detail                                  | Cause                                        |
+| ------ | --------------------------------------- | -------------------------------------------- |
+| `400`  | `production_payments_not_supported`     | Request was made with a production API key.  |
+
+---
+
+## Verify a payment proof
+
+<br />
+
+```
+POST /v1/payments/verify
+```
+
+Verifies a payment proof and, if valid, records the charge against the mandate's budget. The Mandate middleware (`requireKyaPayment()`) calls this endpoint automatically when a merchant receives a request with an `X-Payment-Proof` header. You can also call it directly if you are implementing a custom verification flow.
+
+Verification runs in this order:
+
+1. Proof timestamp within the 5-minute validity window
+2. Amount and currency match the expected values (exact string comparison)
+3. HMAC-SHA256 signature is valid
+4. Nonce has not been used before (replay protection)
+5. Nonce is marked as used in the database
+6. Mandate budget is incremented atomically
+7. Transaction record is created with `status: "paid"`
+8. Audit log event is written
+
+<Note>
+  Proofs are valid for exactly 5 minutes from their `timestamp`. A proof with a timestamp older than 5 minutes returns `verified: false` with `reason: "proof_expired"`. Generate a new proof and retry.
+</Note>
+
+<Warning>
+  A successful verification immediately charges the mandate's budget. The `spent_total` on the mandate is incremented atomically. There is no undo or refund path in the current release.
+</Warning>
+
+**Request body**
+
+<ParamField body="proof" type="object" required>
+  The proof object returned by `POST /v1/payments/proof`. Pass the entire object without modification.
+</ParamField>
+
+<ParamField body="merchant_domain" type="string" required>
+  The domain of the merchant receiving the payment, e.g. `"api.example.com"`. Used to look up the merchant record on the transaction.
+</ParamField>
+
+<ParamField body="expected_amount" type="string" required>
+  The amount the merchant expects to receive. Must be an exact string match with `proof.amount`.
+</ParamField>
+
+<ParamField body="expected_currency" type="string" default="USDC">
+  The currency the merchant expects. Must be an exact string match with `proof.currency`.
+</ParamField>
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST https://api.kya.dev/v1/payments/verify \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "proof": {
+      "scheme": "kya-sandbox",
+      "network": "sandbox",
+      "agentId": "agent_abc123",
+      "mandateId": "mandate_xyz789",
+      "amount": "0.10",
+      "currency": "USDC",
+      "resource": "https://api.example.com/data/companies/AAPL",
+      "nonce": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "timestamp": "2024-01-15T10:30:00+00:00",
+      "signature": "a1b2c3d4e5f6..."
+    },
+    "merchant_domain": "api.example.com",
+    "expected_amount": "0.10",
+    "expected_currency": "USDC"
+  }'
+```
+
+```typescript TypeScript
+const res = await fetch("https://api.kya.dev/v1/payments/verify", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer ky_sand_••••••••••••••••",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    proof,
+    merchant_domain: "api.example.com",
+    expected_amount: "0.10",
+    expected_currency: "USDC",
+  }),
+});
+const result = await res.json();
+if (!result.verified) {
+  throw new Error(`Payment failed: ${result.reason}`);
+}
+```
+
+</CodeGroup>
+
+**Response — verified**
+
+<ResponseField name="verified" type="boolean" required>
+  `true` when verification succeeds and the charge has been recorded.
+</ResponseField>
+
+<ResponseField name="transaction_id" type="string" required>
+  The ID of the `paid` transaction record created for this charge.
+</ResponseField>
+
+```json Example response — verified
+{
+  "verified": true,
+  "transaction_id": "transaction_ghi789"
+}
+```
+
+**Response — not verified**
+
+<ResponseField name="verified" type="boolean" required>
+  `false` when any verification step fails.
+</ResponseField>
+
+<ResponseField name="reason" type="string" required>
+  Machine-readable failure reason. Possible values: `proof_expired`, `amount_mismatch`, `invalid_signature`, `nonce_reused`.
+</ResponseField>
+
+```json Example response — not verified
+{
+  "verified": false,
+  "reason": "nonce_reused"
+}
+```
+
+| Reason              | Cause                                                              |
+| ------------------- | ------------------------------------------------------------------ |
+| `proof_expired`     | Proof timestamp is more than 5 minutes old.                        |
+| `amount_mismatch`   | `proof.amount` or `proof.currency` does not match the expected values. |
+| `invalid_signature` | HMAC-SHA256 signature does not match the recomputed value.         |
+| `nonce_reused`      | Proof nonce has already been consumed by a previous verification.  |

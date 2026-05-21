@@ -1,0 +1,130 @@
+---
+title: 'Protect Your API Endpoints with Mandate'
+description: 'Add Mandate payment-gating to any Hono or Express endpoint. Issue 402 challenges, verify proofs, and access paying agent context in five lines of code.'
+---
+
+The `@mandate/middleware` package lets you gate any API endpoint behind a Mandate payment check. When an agent sends a request without a valid payment proof, the middleware returns a `402 Payment Required` response with a structured challenge. When the agent presents a valid proof, the middleware verifies it with the Mandate API and calls your handler — you get the agent ID, mandate ID, and transaction ID to use in your own logging or business logic.
+
+## Install the middleware
+
+```bash
+npm install @mandate/middleware
+```
+
+## Hono
+
+Use `requireKyaPayment` as route-level middleware:
+
+```typescript
+import { Hono } from 'hono'
+import { requireKyaPayment } from '@mandate/middleware'
+
+const app = new Hono()
+
+app.get(
+  '/premium/data',
+  requireKyaPayment({
+    price: '0.10',
+    currency: 'USDC',
+    category: 'data',
+    merchantDomain: 'api.yourdomain.com', // optional, auto-detected if omitted
+  }),
+  (c) => {
+    const agentId = c.get('kyaAgentId')
+    const mandateId = c.get('kyaMandateId')
+    const transactionId = c.get('kyaTransactionId')
+    return c.json({ data: '...', paid_by: agentId })
+  }
+)
+```
+
+<Tip>
+On a verified request, `kyaAgentId`, `kyaMandateId`, and `kyaTransactionId` are set in the Hono context. Log them alongside your response data to build a per-agent audit trail.
+</Tip>
+
+## Express
+
+Use `requireKyaPaymentExpress` as route middleware:
+
+```typescript
+import express from 'express'
+import { requireKyaPaymentExpress } from '@mandate/middleware'
+
+const app = express()
+
+app.get(
+  '/premium/data',
+  requireKyaPaymentExpress({
+    price: '0.10',
+    currency: 'USDC',
+    category: 'data',
+  }),
+  (req, res) => {
+    const { agentId, mandateId, transactionId } = (req as any).kya
+    res.json({ data: '...', paid_by: agentId })
+  }
+)
+```
+
+<Tip>
+On a verified request, `req.kya` contains `agentId`, `mandateId`, and `transactionId`. Log them alongside your response data to build a per-agent audit trail.
+</Tip>
+
+## Middleware options
+
+Both `requireKyaPayment` and `requireKyaPaymentExpress` accept the same `KyaPaymentOptions` object:
+
+| Option | Required | Default | Description |
+|---|---|---|---|
+| `price` | Yes | — | Amount to charge per request, as a string (e.g. `"0.10"`) |
+| `currency` | No | `"USDC"` | Payment currency |
+| `category` | No | `""` | Payment category for mandate policy matching (e.g. `"data"`, `"compute"`) |
+| `merchantDomain` | No | Auto-detected from request | Your API's domain; falls back to `MANDATE_MERCHANT_DOMAIN` env var |
+| `kyaApiUrl` | No | `https://api.kya.dev` | Mandate API URL; falls back to `MANDATE_API_URL` env var |
+| `kyaApiKey` | No | `""` | Your Mandate API key; falls back to `MANDATE_API_KEY` env var |
+
+## How the 402 response works
+
+When a request arrives without an `X-Payment-Proof` header, the middleware returns `402 Payment Required` with a JSON body and an `X-Payment-Challenge` header containing a base64url-encoded challenge:
+
+```json
+{
+  "error": "payment_required",
+  "x402": {
+    "x402Version": 1,
+    "accepts": [
+      {
+        "scheme": "kya-sandbox",
+        "network": "sandbox",
+        "amount": "0.10",
+        "currency": "USDC",
+        "address": "sandbox",
+        "resource": "https://api.example.com/premium/data"
+      }
+    ]
+  }
+}
+```
+
+The `scheme` is `kya-sandbox` when you use a sandbox API key (`ky_sand_...`) and `kya-usdc` for production keys. The Mandate SDK reads this challenge and handles the full payment flow automatically — your seller-side code does not need to do anything else.
+
+## Verification flow
+
+For every request that includes an `X-Payment-Proof` header, the middleware:
+
+1. Decodes the base64url proof from the header.
+2. Calls `POST /v1/payments/verify` on the Mandate API with the proof, your merchant domain, and the expected amount and currency.
+3. If verification fails, returns `402` with `{ "error": "payment_verification_failed" }`.
+4. If verification succeeds, sets the agent context on the request and calls `next()`.
+
+<Note>
+The middleware calls `POST /v1/payments/verify` on every verified request. Each successful verification records a transaction and consumes the proof's nonce — the same proof cannot be reused.
+</Note>
+
+## Environment variables
+
+| Variable | Description |
+|---|---|
+| `MANDATE_API_KEY` | Your Mandate API key (sandbox or production) |
+| `MANDATE_API_URL` | Optional; defaults to `https://api.kya.dev` |
+| `MANDATE_MERCHANT_DOMAIN` | Optional; your merchant domain, used when `merchantDomain` is not passed in options |

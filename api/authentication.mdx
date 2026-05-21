@@ -1,0 +1,101 @@
+---
+title: "Authenticate with the Mandate API"
+description: "Every request to the Mandate API requires a Bearer token. Learn how to create, use, and rotate API keys for sandbox and production environments."
+---
+
+Every request you make to `https://api.kya.dev/v1` must include an `Authorization` header with a valid API key. Mandate uses two key types — sandbox keys for development and testing, and production keys for live workloads — and enforces them strictly so that sandbox operations can never accidentally affect real funds.
+
+## API key types
+
+| Key type     | Prefix      | Use                                      |
+| ------------ | ----------- | ---------------------------------------- |
+| `sandbox`    | `ky_sand_`  | Development and testing. No real charges. |
+| `production` | `ky_prod_`  | Live deployments with real payments.      |
+
+Sandbox keys allow all API operations but refuse to process real payment settlement. Certain endpoints — such as `POST /v1/payments/proof` — are only available to sandbox keys and return `400 production_payments_not_supported` if you call them with a production key.
+
+## Sending the authorization header
+
+Include your API key as a Bearer token on every request:
+
+```
+Authorization: Bearer <api_key>
+```
+
+<CodeGroup>
+
+```bash cURL
+curl https://api.kya.dev/v1/agents \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••"
+```
+
+```typescript TypeScript
+const response = await fetch("https://api.kya.dev/v1/agents", {
+  headers: {
+    Authorization: "Bearer ky_sand_••••••••••••••••",
+  },
+});
+```
+
+</CodeGroup>
+
+## Creating an API key
+
+You can create additional API keys from the dashboard **Settings** page, or programmatically via the API. If you already have a valid key, authenticate your request and `POST /v1/accounts/api-keys`:
+
+```bash cURL
+curl --request POST https://api.kya.dev/v1/accounts/api-keys \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "label": "CI runner",
+    "key_type": "sandbox"
+  }'
+```
+
+**Request body**
+
+<ParamField body="label" type="string">
+  A human-readable label to identify this key in the dashboard. Optional but recommended.
+</ParamField>
+
+<ParamField body="key_type" type="string" default="sandbox">
+  The key type to create. Must be `"sandbox"` or `"production"`.
+</ParamField>
+
+**Response `201`**
+
+```json
+{
+  "id": "key_abc123",
+  "key": "ky_sand_••••••••••••••••",
+  "key_type": "sandbox",
+  "message": "Save this key — it will not be shown again"
+}
+```
+
+<Warning>
+  The raw key value is returned only once, at creation time. Copy it immediately and store it in a secrets manager. If you lose it, you must create a new key — there is no way to retrieve the original.
+</Warning>
+
+## Listing and revoking API keys
+
+Retrieve metadata for all keys on your account (key values are never returned after creation):
+
+```bash
+GET /v1/accounts/api-keys
+```
+
+Revoke a key immediately — all requests using that key will be rejected:
+
+```bash
+DELETE /v1/accounts/api-keys/{key_id}
+```
+
+## Authentication errors
+
+| HTTP status | Error code  | Cause                                           |
+| ----------- | ----------- | ----------------------------------------------- |
+| `401`       | —           | `Authorization` header is missing or malformed. |
+| `401`       | —           | API key does not exist.                         |
+| `403`       | —           | API key has been revoked.                       |

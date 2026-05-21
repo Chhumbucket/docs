@@ -1,0 +1,211 @@
+---
+title: 'Mandate Middleware for Hono and Express'
+sidebarTitle: 'Middleware'
+description: 'Full reference for @mandate/middleware — add payment-gating to any Hono or Express route. The middleware issues 402 challenges and verifies proofs automatically.'
+---
+
+`@mandate/middleware` lets you gate any HTTP endpoint behind a Mandate payment check without writing any payment logic yourself. Drop `requireKyaPayment` (Hono) or `requireKyaPaymentExpress` (Express) in front of your route handler and the middleware takes care of issuing 402 challenges, decoding incoming proofs, and verifying them against the Mandate API before your handler runs.
+
+## Installation
+
+```bash
+npm install @mandate/middleware
+```
+
+Both `hono` and `express` are optional peer dependencies — install whichever framework you use.
+
+---
+
+## KyaPaymentOptions
+
+Both middleware functions accept the same `KyaPaymentOptions` interface.
+
+<ParamField body="price" type="string" required>
+  Amount to charge per request, e.g. `"0.10"`.
+</ParamField>
+
+<ParamField body="currency" type="string">
+  Payment currency. Defaults to `"USDC"`.
+</ParamField>
+
+<ParamField body="category" type="string">
+  Resource category used for mandate matching, e.g. `"data"` or `"reports"`.
+</ParamField>
+
+<ParamField body="merchantDomain" type="string">
+  Your API's merchant domain. Auto-detected from the incoming request URL when omitted. You can also set this via the `MANDATE_MERCHANT_DOMAIN` environment variable.
+</ParamField>
+
+<ParamField body="kyaApiUrl" type="string">
+  Mandate API base URL. Defaults to the `MANDATE_API_URL` environment variable, then `https://api.kya.dev`.
+</ParamField>
+
+<ParamField body="kyaApiKey" type="string">
+  Mandate API key used to verify proofs. Defaults to the `MANDATE_API_KEY` environment variable.
+</ParamField>
+
+---
+
+## requireKyaPayment — Hono
+
+```typescript
+import { requireKyaPayment } from '@mandate/middleware'
+```
+
+`requireKyaPayment(options)` returns a Hono middleware function. When a request arrives without an `X-Payment-Proof` header, the middleware responds with HTTP 402 and an `X-Payment-Challenge` header. When a valid proof is present and verified, it sets three context variables and calls `next()`.
+
+### Context variables
+
+Retrieve these in your handler with `c.get()`:
+
+| Variable          | Type     | Description                              |
+| ----------------- | -------- | ---------------------------------------- |
+| `kyaAgentId`      | `string` | The agent that submitted the proof.      |
+| `kyaMandateId`    | `string` | The mandate used to authorize payment.   |
+| `kyaTransactionId`| `string` | Unique transaction ID for this payment.  |
+
+### Hono example
+
+```typescript
+import { Hono } from 'hono'
+import { requireKyaPayment } from '@mandate/middleware'
+
+const app = new Hono()
+
+app.get(
+  '/data/companies/:ticker',
+  requireKyaPayment({
+    price: '0.05',
+    currency: 'USDC',
+    category: 'data',
+  }),
+  async (c) => {
+    const agentId = c.get('kyaAgentId')
+    const ticker = c.req.param('ticker')
+
+    console.log(`Agent ${agentId} accessed ${ticker}`)
+
+    return c.json({
+      ticker,
+      price: 142.50,
+      paid_by: agentId,
+      transaction_id: c.get('kyaTransactionId'),
+    })
+  }
+)
+```
+
+---
+
+## requireKyaPaymentExpress — Express
+
+```typescript
+import { requireKyaPaymentExpress } from '@mandate/middleware'
+```
+
+`requireKyaPaymentExpress(options)` returns a standard Express `(req, res, next)` middleware function. On successful verification, it attaches a `kya` object to the request before calling `next()`.
+
+### Request augmentation
+
+The middleware attaches `(req as any).kya` with the following fields:
+
+| Field           | Type     | Description                              |
+| --------------- | -------- | ---------------------------------------- |
+| `agentId`       | `string` | The agent that submitted the proof.      |
+| `mandateId`     | `string` | The mandate used to authorize payment.   |
+| `transactionId` | `string` | Unique transaction ID for this payment.  |
+
+### Express example
+
+```typescript
+import express from 'express'
+import { requireKyaPaymentExpress } from '@mandate/middleware'
+
+const app = express()
+
+app.get(
+  '/reports/:id',
+  requireKyaPaymentExpress({
+    price: '1.00',
+    currency: 'USDC',
+    category: 'reports',
+  }),
+  (req, res) => {
+    const kya = (req as any).kya
+    res.json({
+      report: '...',
+      paid_by: kya.agentId,
+    })
+  }
+)
+```
+
+---
+
+## 402 response format
+
+When a request arrives without an `X-Payment-Proof` header, the middleware responds with HTTP 402 and this body:
+
+```json
+{
+  "error": "payment_required",
+  "x402": {
+    "x402Version": 1,
+    "accepts": [
+      {
+        "scheme": "kya-sandbox",
+        "network": "sandbox",
+        "amount": "0.10",
+        "currency": "USDC",
+        "address": "sandbox",
+        "resource": "https://api.example.com/premium/data"
+      }
+    ]
+  }
+}
+```
+
+The response also includes:
+
+```
+X-Payment-Challenge: <base64url-encoded PaymentChallenge>
+```
+
+<Note>
+  The `scheme` and `network` fields in the challenge reflect your API key type. Sandbox keys (`ky_sand_*`) produce `scheme: "kya-sandbox"` and `network: "sandbox"`. Production keys produce `scheme: "kya-usdc"` and `network: "base"`.
+</Note>
+
+<Warning>
+  Payment proofs are single-use. If a client retries a request using the same `X-Payment-Proof` header after the proof has already been consumed, the verify call will fail. Clients must not reuse proofs across retries — each attempt requires a fresh proof from Mandate.
+</Warning>
+
+---
+
+## Verification flow
+
+When `X-Payment-Proof` is present, both middleware functions follow the same steps:
+
+<Steps>
+  <Step title="Decode the proof header">
+    Base64url-decodes the `X-Payment-Proof` value and validates its shape. Returns HTTP 402 with `error: "invalid_proof_header"` if decoding fails.
+  </Step>
+  <Step title="Verify with Mandate">
+    Calls `POST /v1/payments/verify` with the proof, merchant domain, expected amount, and expected currency.
+  </Step>
+  <Step title="Handle verification failure">
+    If `verified` is `false`, responds with HTTP 402 and `error: "payment_verification_failed"` plus the server's `reason` field.
+  </Step>
+  <Step title="Attach payment context">
+    Sets `agent_id`, `mandate_id`, and `transaction_id` from the verification response on the request context, then calls `next()`.
+  </Step>
+</Steps>
+
+---
+
+## Environment variables
+
+| Variable                  | Description                                                                 |
+| ------------------------- | --------------------------------------------------------------------------- |
+| `MANDATE_API_KEY`         | Mandate API key used to verify proofs. Required if not passed via options.  |
+| `MANDATE_API_URL`         | Mandate API base URL. Defaults to `https://api.kya.dev`.                   |
+| `MANDATE_MERCHANT_DOMAIN` | Your API's merchant domain. Used when `merchantDomain` is not set in options. |

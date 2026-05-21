@@ -1,0 +1,188 @@
+---
+title: "Get Started with Mandate"
+description: "Go from zero to a verified sandbox payment in five steps: create an account, install the SDK, register an agent, create a mandate, and call fetchWithPayment."
+---
+
+Mandate gives your AI agent a verified identity and a spending policy that sellers can trust. This guide walks you through every step — from signing up to making your first authenticated payment — entirely in the sandbox. No real USDC required.
+
+<Note>
+  Sandbox API keys start with `ky_sand_`. Every request in this guide uses the sandbox environment. No real money moves until you switch to a production key.
+</Note>
+
+<Steps>
+  <Step title="Create an account">
+    Sign up at [usemandate.xyz](https://usemandate.xyz). After email verification, the dashboard creates your account and issues a sandbox API key automatically.
+
+    Your sandbox API key looks like this:
+
+    ```
+    ky_sand_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ```
+
+    Store this key in a `.env` file or your secrets manager. The dashboard will not show it again after the initial display.
+
+    ```bash .env
+    MANDATE_API_KEY=ky_sand_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ```
+  </Step>
+
+  <Step title="Install the SDK">
+    Install the Mandate SDK with your package manager:
+
+    ```bash npm
+    npm install @mandate/sdk
+    ```
+
+    ```bash pnpm
+    pnpm add @mandate/sdk
+    ```
+
+    ```bash yarn
+    yarn add @mandate/sdk
+    ```
+
+    The SDK exports `KyaPaymentsClient` — the main class your agent uses to make payments — along with typed error classes for handling policy denials and payment failures.
+  </Step>
+
+  <Step title="Register an agent">
+    Before your agent can pay for anything, you need to register it. Each registered agent gets a stable `agent_id` that sellers can verify independently.
+
+    Send a `POST /v1/agents` request with a name, an optional description, and any capability tags:
+
+    ```bash curl
+    curl -X POST https://api.kya.dev/v1/agents \
+      -H "Authorization: Bearer $MANDATE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "research-agent-v1",
+        "description": "Fetches market data for the portfolio analysis pipeline",
+        "capabilities": ["data-fetch", "read-only"]
+      }'
+    ```
+
+    The response includes your agent's ID:
+
+    ```json
+    {
+      "id": "agt_xxx",
+      "name": "research-agent-v1",
+      "description": "Fetches market data for the portfolio analysis pipeline",
+      "capabilities": ["data-fetch", "read-only"],
+      "status": "active",
+      "sandbox": true,
+      "created_at": "2025-01-15T10:00:00Z"
+    }
+    ```
+
+    Copy the `id` — you'll use it as `agent_id` in every mandate and payment request.
+  </Step>
+
+  <Step title="Create a mandate">
+    A mandate is the spending policy attached to your agent. It defines what the agent is allowed to spend, where, and for how long. You must have an active mandate before the policy engine will approve any payment.
+
+    ```bash curl
+    curl -X POST https://api.kya.dev/v1/mandates \
+      -H "Authorization: Bearer $MANDATE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "agent_id": "agt_xxx",
+        "purpose": "Fetch market data for daily portfolio analysis",
+        "max_spend_total": "10.00",
+        "max_spend_per_transaction": "0.50",
+        "currency": "USDC",
+        "allowed_sellers": ["api.example.com"],
+        "allowed_categories": ["data", "analytics"],
+        "expires_at": "2025-12-31T23:59:59Z"
+      }'
+    ```
+
+    The response confirms the mandate and returns its ID:
+
+    ```json
+    {
+      "id": "mnd_xxx",
+      "agent_id": "agt_xxx",
+      "purpose": "Fetch market data for daily portfolio analysis",
+      "max_spend_total": "10.00",
+      "max_spend_per_transaction": "0.50",
+      "currency": "USDC",
+      "allowed_sellers": ["api.example.com"],
+      "allowed_categories": ["data", "analytics"],
+      "expires_at": "2025-12-31T23:59:59Z",
+      "status": "active",
+      "spent_total": "0.00",
+      "sandbox": true,
+      "created_at": "2025-01-15T10:01:00Z"
+    }
+    ```
+
+    | Field | Description |
+    |---|---|
+    | `max_spend_total` | Total USDC budget for the lifetime of this mandate |
+    | `max_spend_per_transaction` | Maximum USDC for any single payment |
+    | `allowed_sellers` | Domain allowlist — empty array means any seller is permitted |
+    | `allowed_categories` | Category allowlist — empty array means any category is permitted |
+    | `expires_at` | ISO 8601 timestamp after which the mandate is automatically revoked |
+  </Step>
+
+  <Step title="Make your first payment">
+    With an agent registered and a mandate in place, your agent can now make authenticated payments. Import `KyaPaymentsClient` and call `fetchWithPayment` — the SDK handles the full x402 challenge–policy–proof cycle automatically.
+
+    ```typescript
+    import { KyaPaymentsClient } from '@mandate/sdk'
+
+    const client = new KyaPaymentsClient({
+      apiKey: process.env.MANDATE_API_KEY,
+    })
+
+    const response = await client.fetchWithPayment(
+      'https://api.example.com/premium/data',
+      { agentId: 'agt_xxx', mandateId: 'mnd_xxx' }
+    )
+    const data = await response.json()
+    ```
+
+    Under the hood, `fetchWithPayment` does the following:
+
+    1. Sends the initial request — if the server returns `200`, it returns the response immediately.
+    2. If the server returns `402`, it parses the payment challenge from the response headers.
+    3. Calls `POST /v1/policy/evaluate` to check the transaction against your mandate.
+    4. If the policy engine approves, calls `POST /v1/payments/proof` to get a signed proof.
+    5. Retries the original request with `X-Payment-Proof` and `X-Kya-Agent-Id` headers attached.
+
+    To handle policy denials and payment failures explicitly:
+
+    ```typescript
+    import {
+      KyaPaymentsClient,
+      PolicyDeniedError,
+      PaymentFailedError,
+    } from '@mandate/sdk'
+
+    const client = new KyaPaymentsClient({
+      apiKey: process.env.MANDATE_API_KEY,
+    })
+
+    try {
+      const response = await client.fetchWithPayment(
+        'https://api.example.com/premium/data',
+        { agentId: 'agt_xxx', mandateId: 'mnd_xxx' }
+      )
+      const data = await response.json()
+      console.log(data)
+    } catch (err) {
+      if (err instanceof PolicyDeniedError) {
+        console.error('Blocked by policy:', err.reason_code, err.detail)
+      } else if (err instanceof PaymentFailedError) {
+        console.error('Payment failed:', err.message)
+      } else {
+        throw err
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  The sandbox supports more advanced testing scenarios — including proof generation, replay protection, and deliberate policy violations. See the [Sandbox guide](/sandbox) for details.
+</Tip>

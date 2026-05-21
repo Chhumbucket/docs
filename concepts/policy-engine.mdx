@@ -1,0 +1,125 @@
+---
+title: "Policy Engine: How Payments Are Approved"
+description: "See how Mandate's policy engine evaluates every payment request against 9 sequential checks — and what reason code it returns when a check fails."
+---
+
+Every time your agent attempts a payment, Mandate's policy engine runs automatically before any proof is issued. The engine evaluates the request against 9 checks in sequence. The first check to fail immediately halts evaluation and returns a denial with a specific reason code. Only a request that passes all 9 checks receives an `"approved"` decision. You never need to call the policy engine directly — the Mandate SDK handles this for you — but understanding the check sequence helps you configure mandates correctly and debug denials quickly.
+
+## How to trigger an evaluation
+
+```bash
+POST /v1/policy/evaluate
+```
+
+```json
+{
+  "agent_id": "agt_abc123",
+  "mandate_id": "mnd_xyz789",
+  "merchant_domain": "api.example.com",
+  "amount": "0.10",
+  "currency": "USDC",
+  "resource_url": "https://api.example.com/premium/data",
+  "category": "data"
+}
+```
+
+**Response:**
+
+```json
+{
+  "decision": "approved",
+  "reason_code": "within_policy",
+  "reason_detail": null,
+  "agent_id": "agt_abc123",
+  "mandate_id": "mnd_xyz789",
+  "transaction_id": "txn_01j9k2m3p4q5r6s7t8u9v0w1x"
+}
+```
+
+When the decision is `"denied"`, the same structure is returned with a non-null `reason_code` and `reason_detail`. The HTTP status code is `200` for approved and `402` for denied.
+
+## The 9 checks
+
+<AccordionGroup>
+  <Accordion title="Check 1 — Agent exists" icon="user">
+    Mandate looks up the agent by `agent_id`. If no agent record is found, evaluation stops immediately.
+
+    **Failure reason code:** `agent_revoked`
+
+    **What to do:** Confirm the `agent_id` is correct and belongs to your account. Agents are environment-scoped — a sandbox agent ID cannot be used with a production key.
+  </Accordion>
+
+  <Accordion title="Check 2 — Agent status is active" icon="circle-check">
+    The agent record must have `status: "active"`. A revoked agent fails this check.
+
+    **Failure reason code:** `agent_revoked`
+
+    **What to do:** Revocation is permanent. Create a new agent and update your mandates to reference the new ID. See [Agents](/concepts/agents).
+  </Accordion>
+
+  <Accordion title="Check 3 — Mandate exists and belongs to the agent" icon="file-contract">
+    Mandate looks up the mandate by `mandate_id` and confirms that its `agent_id` matches the agent in the request. A mandate belonging to a different agent will fail this check.
+
+    **Failure reason code:** `mandate_expired`
+
+    **What to do:** Verify that `mandate_id` is correct and was created with the same `agent_id` you are passing in this request.
+  </Accordion>
+
+  <Accordion title="Check 4 — Mandate status is active" icon="toggle-on">
+    The mandate must have `status: "active"`. Mandates with status `revoked` or `exhausted` fail this check.
+
+    **Failure reason code:** `mandate_expired`
+
+    **What to do:** If the mandate is `exhausted`, create a new mandate with a fresh budget. If it has been `revoked`, create a replacement mandate.
+  </Accordion>
+
+  <Accordion title="Check 5 — Mandate has not expired" icon="clock">
+    The mandate's `expires_at` timestamp must be in the future (i.e., `expires_at > now`). An expired mandate fails this check even if it still has remaining budget.
+
+    **Failure reason code:** `mandate_expired`
+
+    **What to do:** Create a new mandate with an updated `expires_at`. There is currently no way to extend a mandate's expiration in place.
+  </Accordion>
+
+  <Accordion title="Check 6 — Merchant domain is in the allowlist" icon="globe">
+    The `merchant_domain` in the request must appear in the mandate's `allowed_sellers` array, or the array must contain `"*"` (wildcard). An empty `allowed_sellers` array blocks all merchants — unlike `allowed_categories`, an empty seller list is not a wildcard.
+
+    **Failure reason code:** `merchant_not_allowed`
+
+    **What to do:** Add the merchant's domain to `allowed_sellers` when creating the mandate, or use `["*"]` if you want to allow any seller. Note that mandates are immutable after creation — you must create a new mandate to change the allowlist.
+  </Accordion>
+
+  <Accordion title="Check 7 — Category is in the allowlist" icon="tag">
+    If the request includes a `category`, it must appear in the mandate's `allowed_categories` array. If `allowed_categories` is an empty array `[]`, the check is skipped and any category is permitted.
+
+    **Failure reason code:** `merchant_not_allowed`
+
+    **What to do:** Add the category to `allowed_categories` when creating the mandate. To allow all categories, leave `allowed_categories` as an empty array. See [Mandates](/concepts/mandates) for details on the empty-array semantics.
+  </Accordion>
+
+  <Accordion title="Check 8 — Amount is within the per-transaction limit" icon="arrow-down-to-line">
+    The `amount` in the request must be less than or equal to the mandate's `max_spend_per_transaction`.
+
+    **Failure reason code:** `amount_exceeds_per_transaction_limit`
+
+    **What to do:** Either use a mandate with a higher `max_spend_per_transaction`, or split the purchase into smaller transactions. Per-transaction limits are set at mandate creation and cannot be changed.
+  </Accordion>
+
+  <Accordion title="Check 9 — Amount is within the remaining total budget" icon="wallet">
+    The sum of `spent_total + amount` must be less than or equal to `max_spend_total`. This check prevents the agent from exceeding the mandate's lifetime budget cap.
+
+    **Failure reason code:** `total_budget_exceeded`
+
+    **What to do:** Create a new mandate with a higher `max_spend_total`, or with a fresh budget for the same agent and purpose.
+  </Accordion>
+</AccordionGroup>
+
+## Transaction records
+
+Every call to `POST /v1/policy/evaluate` creates a pending transaction record before the checks run. If the evaluation succeeds, the transaction is updated to `approved`. If any check fails, it is updated to `denied`. If the evaluation itself throws an error mid-way, the transaction is updated to `failed`. You can query all transaction records using `GET /v1/transactions`.
+
+## Pre-flight checks with POST /v1/verify-agent
+
+<Info>
+  `POST /v1/verify-agent` runs the same 9 policy checks as the policy engine but **does not** create a transaction record or charge the mandate. Use it to confirm that an agent and mandate are correctly configured before sending real payment requests — for example, during integration testing or in a pre-flight health check. It also returns identity details, remaining budget, and a risk placeholder in the response.
+</Info>

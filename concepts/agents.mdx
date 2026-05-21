@@ -1,0 +1,81 @@
+---
+title: "Agents: Registering Your AI Agent with Mandate"
+description: "Create and manage registered agent identities in Mandate so your AI systems can make payments on your behalf within defined spending policies."
+---
+
+An agent in Mandate is a registered identity for an AI system that makes payments on your behalf. Every payment proof, mandate, and transaction record is tied to a specific agent ID, giving you a clean audit trail that shows exactly which system spent what, where, and why. Before an agent can make any payment, you must register it and attach at least one mandate to it.
+
+## What an agent is
+
+Agents represent AI systems — an autonomous worker, a background job, a function-calling model, or any software that will call paid APIs on your behalf. Mandate does not care what the agent does internally; it only cares about the agent's registered identity and current status when evaluating whether a payment is allowed.
+
+Each agent has a stable identifier in the format `agt_xxx` that you use in mandates, SDK calls, and payment proofs. This ID never changes after creation.
+
+## Agent fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | string | — | Stable identifier assigned by Mandate (`agt_xxx`). Read-only. |
+| `name` | string | Yes | Human-readable name for the agent. Appears in the dashboard and audit log. |
+| `description` | string | No | Optional explanation of what this agent does. |
+| `capabilities` | string[] | No | List of capability tags (e.g., `["web-search", "data-retrieval"]`). Used for auditability, not policy enforcement. |
+| `status` | string | — | `active` or `revoked`. Newly created agents are always `active`. Read-only. |
+| `created_at` | string | — | ISO 8601 timestamp. Read-only. |
+| `revoked_at` | string | — | ISO 8601 timestamp. Populated when the agent is revoked. Read-only. |
+
+## Agent statuses
+
+- **`active`** — the agent can make payments. Policy evaluation proceeds normally.
+- **`revoked`** — the agent is permanently disabled. Any policy evaluation that references a revoked agent returns `{ "decision": "denied", "reason_code": "agent_revoked" }` immediately, regardless of mandate settings.
+
+There is no way to re-activate a revoked agent. If you need to re-enable an agent identity, create a new agent and update your mandates to reference the new ID.
+
+## Sandbox vs. production agents
+
+Agents are created under the environment of the API key you use. Sandbox agents are isolated from production — they cannot be used with production API keys, and vice versa. The agent ID format is the same (`agt_xxx`) in both environments.
+
+## Creating an agent
+
+```bash
+POST /v1/agents
+```
+
+```json
+{
+  "name": "Market Research Agent",
+  "description": "Fetches company data and news for investment analysis.",
+  "capabilities": ["data-retrieval", "web-search"]
+}
+```
+
+**Response (`201 Created`):**
+
+```json
+{
+  "id": "agt_01j9k2m3p4q5r6s7t8u9v0w1x",
+  "name": "Market Research Agent",
+  "description": "Fetches company data and news for investment analysis.",
+  "capabilities": ["data-retrieval", "web-search"],
+  "status": "active",
+  "created_at": "2025-10-14T09:00:00.000Z",
+  "revoked_at": null
+}
+```
+
+The `id` returned here is what you pass as `agent_id` when creating mandates and calling `fetchWithPayment()` in the SDK.
+
+## Revoking an agent
+
+```bash
+PATCH /v1/agents/{agent_id}/revoke
+```
+
+No request body is required. The response returns the updated agent object with `status: "revoked"` and a `revoked_at` timestamp.
+
+<Warning>
+  Revoking an agent takes effect immediately. Any in-flight policy evaluation or payment proof that references the revoked agent will be denied. All mandates attached to the agent become inoperable — the agent cannot be re-activated, and its mandates cannot be transferred to a different agent. Revoke only when you intend the agent to be permanently decommissioned.
+</Warning>
+
+<Tip>
+  Use descriptive `name` values and populate `capabilities` even though Mandate does not enforce them in policy checks. The agent name appears in every audit log entry and transaction record — a name like `"Market Research Agent v2 (prod)"` is far more useful than `"agent-1"` when you are debugging a payment six months later.
+</Tip>

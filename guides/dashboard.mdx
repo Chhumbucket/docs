@@ -1,0 +1,92 @@
+---
+title: 'Managing Agents and Mandates in the Dashboard'
+description: 'A tour of the Mandate web dashboard: register agents, create spending mandates, review transaction history, and generate API keys — no code required.'
+---
+
+The Mandate dashboard gives you a central place to manage every part of your agent commerce setup — from registering agents and configuring spending limits to reviewing every policy decision and generating API keys. You do not need to call any API directly; everything in this guide is available through the UI.
+
+## Overview
+
+The overview page shows your account at a glance:
+
+- **Total agents** — how many agents you have registered
+- **Active mandates** — mandates currently in an active state
+- **Recent transactions** — the latest payment activity across all agents
+- **Spend summary** — total USDC charged across all mandates
+
+Use this page to spot unusual activity quickly before drilling into the details.
+
+## Agents
+
+The agents page lists every agent registered to your account. From here you can:
+
+**Create a new agent.** Click **New agent** and provide a name, an optional description, and the capabilities the agent will use. After creation, the agent gets a unique `agt_...` ID you pass to the SDK.
+
+**View agent details.** Click any agent to see its ID, status, creation date, and the mandates associated with it.
+
+**Revoke an agent.** Click **Revoke** on the agent detail page. Revoking an agent is irreversible — all future policy evaluations for that agent will return `agent_revoked` immediately, and the agent's active mandates will stop accepting payments.
+
+## Mandates
+
+A mandate defines the spending rules an agent must operate within. From the mandates page you can:
+
+**Create a mandate.** Select an agent, then set the purpose, budget limits (per-transaction and total), expiry date, allowed merchant domains, and allowed categories. The mandate gets a unique `mnd_...` ID you pass to the SDK alongside the agent ID.
+
+**View mandate details.** The detail view shows:
+- **Budget used** — total USDC charged against this mandate so far
+- **Budget remaining** — how much spending capacity is left
+- **Status** — `active`, `exhausted`, or `revoked`
+
+**Revoke a mandate.** Revoked mandates immediately stop accepting new payments. All future policy evaluations return `mandate_expired`.
+
+## Merchants
+
+The merchants page is for API sellers who want to register their domain with Mandate.
+
+**Register a merchant domain.** Enter the domain your API runs on (e.g. `api.yourdomain.com`). Registration allows mandate allowlists to reference your domain by name and enables reputation tracking across transactions.
+
+**View registered merchants.** See all domains registered to your account along with their registration date.
+
+## Transactions
+
+The transactions page shows every payment that has flowed through Mandate for your account.
+
+**Filter transactions** by agent, mandate, or status (e.g. `paid`, `denied`) to narrow down what you're looking at.
+
+**View policy decisions inline** alongside each transaction to see exactly which policy check ran, what inputs it received, and what outcome it produced.
+
+## Audit log
+
+The audit log is an append-only record of every policy decision and configuration change. You cannot edit or delete entries.
+
+**Filter by:**
+- **Event type** — e.g. `policy_evaluated`, `agent_created`, `mandate_revoked`
+- **Resource type** — e.g. `agent`, `mandate`, `transaction`
+- **Resource ID** — the specific `agt_...`, `mnd_...`, or `txn_...` ID you want to trace
+
+Use the audit log when you need to verify what happened during a specific payment or demonstrate compliance with a policy.
+
+## Settings
+
+### API keys
+
+<Warning>
+API keys are shown only once — at the moment of creation. Copy your key immediately and store it in a secrets manager. If you lose it, you must revoke the key and create a new one.
+</Warning>
+
+From the settings page you can:
+
+- **Create a sandbox key** — prefixed `ky_sand_...`. Sandbox keys only work with the sandbox payment flow; they cannot process real USDC transactions.
+- **Create a production key** — prefixed `ky_prod_...`. Production keys process real USDC payments on Base mainnet.
+- **View existing keys** — you can see key names, prefixes, and creation dates, but not the full key value after creation.
+- **Revoke a key** — revoked keys return `403 Forbidden` immediately on any API request.
+
+<Note>
+Sandbox and production keys are separate and not interchangeable. The SDK and middleware automatically detect which environment they are operating in based on the key prefix. Use sandbox keys during development and integration testing; switch to a production key only when you are ready to process real payments.
+</Note>
+
+## Sandbox tester
+
+The sandbox tester lets you walk through the full payment flow — challenge, policy evaluation, proof generation, and verification — directly in the browser, without writing any code.
+
+Select an agent and mandate, point the tester at a payment-gated endpoint (or use the built-in demo endpoint), and click **Run**. The tester shows each step of the flow and its result, making it easy to confirm your policy configuration is correct before connecting real agents.

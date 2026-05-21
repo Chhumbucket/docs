@@ -1,0 +1,354 @@
+---
+title: "Policy Evaluation and Agent Verification"
+sidebarTitle: "Policy"
+description: "Evaluate proposed payments against your mandate's rules before funds move. Use POST /v1/verify-agent for read-only pre-flight checks without side effects."
+---
+
+The policy engine is the enforcement core of Mandate. It runs a sequential series of checks — agent status, mandate validity, merchant allowlist, category allowlist, per-transaction limit, and total budget — and returns a machine-readable decision. Two endpoints expose the engine: `POST /v1/policy/evaluate` for full evaluation (which also creates a transaction record), and `POST /v1/verify-agent` for a read-only pre-flight check.
+
+---
+
+## Policy checks
+
+The engine runs these checks in order. The first failure terminates evaluation and returns the corresponding reason code.
+
+| # | Check | Failure reason code |
+|---|-------|---------------------|
+| 1 | Agent exists | `agent_revoked` |
+| 2 | Agent `status` is `"active"` | `agent_revoked` |
+| 3 | Mandate exists and belongs to the agent | `mandate_expired` |
+| 4 | Mandate `status` is `"active"` | `mandate_expired` |
+| 5 | Mandate `expires_at` is in the future | `mandate_expired` |
+| 6 | `merchant_domain` is in `allowed_sellers`, or allowlist contains `"*"` | `merchant_not_allowed` |
+| 7 | `category` is in `allowed_categories`, or allowlist contains `"*"`, or allowlist is empty | `merchant_not_allowed` |
+| 8 | `amount` ≤ `max_spend_per_transaction` | `amount_exceeds_per_transaction_limit` |
+| 9 | `spent_total + amount` ≤ `max_spend_total` | `total_budget_exceeded` |
+
+<Note>
+  An empty `allowed_categories` array (`[]`) means **no category restriction** — all categories are permitted. Pass `["*"]` or an explicit list to enforce category-level control.
+</Note>
+
+---
+
+## Evaluate policy
+
+<br />
+
+```
+POST /v1/policy/evaluate
+```
+
+Runs all policy checks for a proposed payment and records the outcome. If approved, a `pending` transaction is created and transitions to `approved`. If denied, the transaction transitions to `denied` and the endpoint returns HTTP `402`.
+
+The Mandate SDK calls this endpoint automatically as part of the `fetchWithPayment()` flow. You can also call it directly for custom payment orchestration or to pre-validate a request before generating a proof.
+
+**Request body**
+
+<ParamField body="agent_id" type="string" required>
+  The agent attempting the payment.
+</ParamField>
+
+<ParamField body="mandate_id" type="string" required>
+  The mandate authorizing this payment.
+</ParamField>
+
+<ParamField body="merchant_domain" type="string" required>
+  The domain of the merchant being paid, e.g. `"api.example.com"`. Checked against the mandate's `allowed_merchants` list.
+</ParamField>
+
+<ParamField body="amount" type="string" required>
+  The payment amount as a decimal string, e.g. `"0.10"`. Checked against `max_spend_per_transaction` and the remaining budget.
+</ParamField>
+
+<ParamField body="currency" type="string" default="USDC">
+  The currency for this payment. Currently `"USDC"` only.
+</ParamField>
+
+<ParamField body="resource_url" type="string" required>
+  The full URL of the resource being purchased, e.g. `"https://api.example.com/data/companies/AAPL"`. Stored on the resulting transaction record.
+</ParamField>
+
+<ParamField body="category" type="string">
+  Optional resource category label, e.g. `"data"`. Checked against the mandate's `allowed_categories` list.
+</ParamField>
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST https://api.kya.dev/v1/policy/evaluate \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "agent_id": "agent_abc123",
+    "mandate_id": "mandate_xyz789",
+    "merchant_domain": "api.example.com",
+    "amount": "0.10",
+    "currency": "USDC",
+    "resource_url": "https://api.example.com/data/companies/AAPL",
+    "category": "data"
+  }'
+```
+
+```typescript TypeScript
+const res = await fetch("https://api.kya.dev/v1/policy/evaluate", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer ky_sand_••••••••••••••••",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    agent_id: "agent_abc123",
+    mandate_id: "mandate_xyz789",
+    merchant_domain: "api.example.com",
+    amount: "0.10",
+    currency: "USDC",
+    resource_url: "https://api.example.com/data/companies/AAPL",
+    category: "data",
+  }),
+});
+// 200 = approved, 402 = denied
+const result = await res.json();
+```
+
+</CodeGroup>
+
+**Response `200` — approved**
+
+<ResponseField name="decision" type="string" required>
+  `"approved"` when all policy checks pass.
+</ResponseField>
+
+<ResponseField name="reason_code" type="string" required>
+  `"within_policy"` when approved.
+</ResponseField>
+
+<ResponseField name="reason_detail" type="string">
+  Human-readable explanation. `null` when approved.
+</ResponseField>
+
+<ResponseField name="agent_id" type="string" required>
+  The agent ID from the request.
+</ResponseField>
+
+<ResponseField name="mandate_id" type="string" required>
+  The mandate ID from the request.
+</ResponseField>
+
+<ResponseField name="transaction_id" type="string" required>
+  The ID of the transaction record created for this evaluation.
+</ResponseField>
+
+```json Example response — approved
+{
+  "decision": "approved",
+  "reason_code": "within_policy",
+  "reason_detail": null,
+  "agent_id": "agent_abc123",
+  "mandate_id": "mandate_xyz789",
+  "transaction_id": "transaction_def456"
+}
+```
+
+**Response `402` — denied**
+
+```json Example response — denied
+{
+  "decision": "denied",
+  "reason_code": "amount_exceeds_per_transaction_limit",
+  "reason_detail": null,
+  "agent_id": "agent_abc123",
+  "mandate_id": "mandate_xyz789",
+  "transaction_id": "transaction_def456"
+}
+```
+
+Possible `reason_code` values on denial: `agent_revoked`, `mandate_expired`, `merchant_not_allowed`, `amount_exceeds_per_transaction_limit`, `total_budget_exceeded`.
+
+---
+
+## Verify agent
+
+<br />
+
+```
+POST /v1/verify-agent
+```
+
+Runs the same policy checks as `POST /v1/policy/evaluate` but does **not** create a transaction record or charge the mandate. Use this for pre-flight checks — for example, to validate that an agent's mandate is still active and has sufficient budget before starting a multi-step workflow.
+
+Returns HTTP `200` when the agent is authorized and `403` when denied.
+
+**Request body**
+
+Same fields as `POST /v1/policy/evaluate`.
+
+<ParamField body="agent_id" type="string" required>
+  The agent to verify.
+</ParamField>
+
+<ParamField body="mandate_id" type="string" required>
+  The mandate to check authorization against.
+</ParamField>
+
+<ParamField body="merchant_domain" type="string" required>
+  The merchant domain to validate against the allowlist.
+</ParamField>
+
+<ParamField body="amount" type="string" required>
+  The intended payment amount as a decimal string.
+</ParamField>
+
+<ParamField body="currency" type="string" default="USDC">
+  The currency for the intended payment.
+</ParamField>
+
+<ParamField body="resource_url" type="string" required>
+  The URL of the resource the agent intends to access.
+</ParamField>
+
+<ParamField body="category" type="string">
+  Optional resource category to check against the mandate's category allowlist.
+</ParamField>
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST https://api.kya.dev/v1/verify-agent \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "agent_id": "agent_abc123",
+    "mandate_id": "mandate_xyz789",
+    "merchant_domain": "api.example.com",
+    "amount": "0.10",
+    "currency": "USDC",
+    "resource_url": "https://api.example.com/data/companies/AAPL",
+    "category": "data"
+  }'
+```
+
+```typescript TypeScript
+const res = await fetch("https://api.kya.dev/v1/verify-agent", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer ky_sand_••••••••••••••••",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    agent_id: "agent_abc123",
+    mandate_id: "mandate_xyz789",
+    merchant_domain: "api.example.com",
+    amount: "0.10",
+    currency: "USDC",
+    resource_url: "https://api.example.com/data/companies/AAPL",
+    category: "data",
+  }),
+});
+// 200 = authorized, 403 = denied
+const result = await res.json();
+```
+
+</CodeGroup>
+
+**Response `200` — authorized**
+
+<ResponseField name="verified" type="boolean" required>
+  `true` when the agent exists and is active.
+</ResponseField>
+
+<ResponseField name="authorized" type="boolean" required>
+  `true` when all policy checks pass.
+</ResponseField>
+
+<ResponseField name="payment_ready" type="boolean" required>
+  `true` when the agent is ready to make a payment under this mandate.
+</ResponseField>
+
+<ResponseField name="agent" type="object" required>
+  <Expandable title="properties">
+    <ResponseField name="id" type="string" required>Agent ID.</ResponseField>
+    <ResponseField name="name" type="string" required>Agent name.</ResponseField>
+    <ResponseField name="capabilities" type="string[]" required>Agent capabilities array.</ResponseField>
+    <ResponseField name="status" type="string" required>Agent status, e.g. `"active"`.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="mandate" type="object" required>
+  <Expandable title="properties">
+    <ResponseField name="id" type="string" required>Mandate ID.</ResponseField>
+    <ResponseField name="purpose" type="string" required>Mandate purpose description.</ResponseField>
+    <ResponseField name="currency" type="string" required>Currency code.</ResponseField>
+    <ResponseField name="remaining_budget" type="string" required>Remaining spend capacity as a decimal string.</ResponseField>
+    <ResponseField name="expires_at" type="string" required>ISO 8601 expiry timestamp.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="risk" type="object" required>
+  <Expandable title="properties">
+    <ResponseField name="score" type="number" required>Risk score (0–100). Currently always `0` in sandbox.</ResponseField>
+    <ResponseField name="flags" type="string[]" required>Active risk flags. Empty array when none.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="recommendation" type="string" required>
+  `"accept"` when authorized, `"deny"` when not.
+</ResponseField>
+
+<ResponseField name="reason_code" type="string" required>
+  `"within_policy"` when authorized. One of `agent_revoked`, `mandate_expired`, `merchant_not_allowed`, `amount_exceeds_per_transaction_limit`, `total_budget_exceeded` when denied.
+</ResponseField>
+
+```json Example response — authorized
+{
+  "verified": true,
+  "authorized": true,
+  "payment_ready": true,
+  "agent": {
+    "id": "agent_abc123",
+    "name": "Research Assistant",
+    "capabilities": ["data-fetch", "financial-research"],
+    "status": "active"
+  },
+  "mandate": {
+    "id": "mandate_xyz789",
+    "purpose": "Financial data research",
+    "currency": "USDC",
+    "remaining_budget": "9.50",
+    "expires_at": "2024-12-31T23:59:59+00:00"
+  },
+  "risk": {
+    "score": 0,
+    "flags": []
+  },
+  "recommendation": "accept",
+  "reason_code": "within_policy"
+}
+```
+
+**Response `403` — denied**
+
+Same structure as the `200` response but with `authorized: false`, `payment_ready: false`, `recommendation: "deny"`, and the appropriate `reason_code`.
+
+```json Example response — denied
+{
+  "verified": false,
+  "authorized": false,
+  "payment_ready": false,
+  "agent": {
+    "id": "agent_abc123",
+    "name": "unknown",
+    "capabilities": [],
+    "status": "unknown"
+  },
+  "mandate": {
+    "id": "mandate_xyz789",
+    "purpose": "",
+    "currency": "USDC",
+    "remaining_budget": "0",
+    "expires_at": ""
+  },
+  "risk": { "score": 0, "flags": [] },
+  "recommendation": "deny",
+  "reason_code": "agent_revoked"
+}
+```

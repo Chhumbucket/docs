@@ -1,0 +1,61 @@
+---
+title: "Mandate: Trust Layer for Autonomous Agent Payments"
+description: "Mandate verifies agent identity and enforces spending policies before any payment moves. Register agents, set mandates, and handle x402 in minutes."
+---
+
+Mandate is the trust and authorization layer for autonomous agent commerce. When your AI agent encounters a paid API, Mandate verifies the agent's identity, checks its spending policy, and either approves the payment or blocks it — in real time, before any USDC leaves the account.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Create your first agent and mandate in under 5 minutes.
+  </Card>
+  <Card title="How It Works" icon="diagram-project" href="/concepts/how-it-works">
+    Understand the full x402 payment flow from challenge to proof.
+  </Card>
+  <Card title="Agent Developer SDK" icon="code" href="/sdk/overview">
+    Add the `@mandate/sdk` to your agent and handle 402 payments automatically.
+  </Card>
+  <Card title="API Seller Middleware" icon="shield-check" href="/sdk/middleware">
+    Protect your API endpoints with `requireKyaPayment()` in 5 lines.
+  </Card>
+</CardGroup>
+
+## What Mandate does
+
+Every autonomous agent that makes purchases needs two things: an identity that sellers can trust, and a spending policy that its owner controls. Mandate provides both.
+
+- **Agent registry** — Register your AI agent and get a stable `agent_id` that sellers can verify
+- **Mandates** — Set per-transaction limits, total budgets, allowed merchants, and expiration dates
+- **Policy engine** — Every payment attempt runs through 9 real-time checks before approval
+- **x402 support** — Native support for the HTTP 402 payment protocol with USDC on Base
+- **Audit log** — Tamper-evident record of every policy decision and transaction
+
+<CardGroup cols={2}>
+  <Card title="Core Concepts" icon="book-open" href="/concepts/how-it-works">
+    Learn about agents, mandates, and the policy engine.
+  </Card>
+  <Card title="API Reference" icon="brackets-curly" href="/api/authentication">
+    Full reference for all REST endpoints.
+  </Card>
+  <Card title="Sandbox Testing" icon="flask" href="/sandbox">
+    Test your integration end-to-end without real payments.
+  </Card>
+  <Card title="Dashboard Guide" icon="gauge" href="/guides/dashboard">
+    Manage agents, mandates, and transactions from the UI.
+  </Card>
+</CardGroup>
+
+## Who uses Mandate
+
+<Tabs>
+  <Tab title="Agent Developers">
+    You're building an AI agent that needs to call paid APIs — data providers, compute services, tools that charge per request. Install `@mandate/sdk`, create an agent, attach a mandate, and your agent handles payments automatically without storing credentials.
+
+    **Start here:** [Agent Developer Guide](/guides/agent-developer)
+  </Tab>
+  <Tab title="API Sellers">
+    You're building an API that charges per request or per resource. Add `requireKyaPayment()` middleware to any endpoint and it automatically handles the x402 challenge/proof flow — no payment logic to write yourself.
+
+    **Start here:** [API Seller Guide](/guides/api-seller)
+  </Tab>
+</Tabs>

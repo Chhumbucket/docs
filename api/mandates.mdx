@@ -1,0 +1,327 @@
+---
+title: "REST API Endpoints for Mandates"
+sidebarTitle: "Mandates"
+description: "Create and manage spending mandates that define an agent's total budget, per-transaction limits, merchant allowlist, and expiration date."
+---
+
+A mandate is a scoped spending authorization attached to a specific agent. It defines the total budget, the per-transaction ceiling, which merchant domains and resource categories are permitted, and an expiry time. Mandate's policy engine evaluates every payment attempt against these constraints before authorizing a charge. You can revoke a mandate at any point to immediately halt all further spending under it.
+
+---
+
+## Create a mandate
+
+<br />
+
+```
+POST /v1/mandates
+```
+
+Creates a new mandate for an agent. The mandate status begins as `"active"` and policy enforcement starts immediately.
+
+**Request body**
+
+<ParamField body="agent_id" type="string" required>
+  The ID of the agent this mandate authorizes. The agent must belong to your account and be in `"active"` status.
+</ParamField>
+
+<ParamField body="purpose" type="string" required>
+  A plain-language description of what this mandate permits, e.g. `"Financial data research"`. Shown in the dashboard and audit log.
+</ParamField>
+
+<ParamField body="max_spend_total" type="string" required>
+  The total budget across the lifetime of this mandate, as a decimal string (e.g. `"10.00"`). The mandate transitions to `"exhausted"` once `spent_total` reaches this value.
+</ParamField>
+
+<ParamField body="max_spend_per_transaction" type="string" required>
+  The maximum amount allowed in a single transaction, as a decimal string (e.g. `"0.50"`). Any payment request exceeding this value is denied with `amount_exceeds_per_transaction_limit`.
+</ParamField>
+
+<ParamField body="currency" type="string" default="USDC">
+  The currency for all spend accounting. Currently `"USDC"` only.
+</ParamField>
+
+<ParamField body="allowed_sellers" type="string[]">
+  An allowlist of merchant domains this agent is permitted to pay. Pass `["*"]` to allow any merchant. If you pass an empty array or omit this field, the mandate will block all merchant domains — you must provide at least one domain or `["*"]` to allow payments.
+</ParamField>
+
+<ParamField body="allowed_categories" type="string[]">
+  An allowlist of resource categories this mandate covers (e.g. `["data", "research"]`). Pass `["*"]` to allow all categories. An **empty array** (`[]`) also permits all categories — the policy engine treats an empty list as "no category restriction".
+</ParamField>
+
+<ParamField body="expires_at" type="string" required>
+  ISO 8601 expiry timestamp for this mandate. After this time, all policy evaluations return `mandate_expired`.
+</ParamField>
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST https://api.kya.dev/v1/mandates \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "agent_id": "agent_abc123",
+    "purpose": "Financial data research",
+    "max_spend_total": "10.00",
+    "max_spend_per_transaction": "0.50",
+    "currency": "USDC",
+    "allowed_sellers": ["data.example.com", "api.financials.io"],
+    "allowed_categories": ["data", "research"],
+    "expires_at": "2024-12-31T23:59:59Z"
+  }'
+```
+
+```typescript TypeScript
+const res = await fetch("https://api.kya.dev/v1/mandates", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer ky_sand_••••••••••••••••",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    agent_id: "agent_abc123",
+    purpose: "Financial data research",
+    max_spend_total: "10.00",
+    max_spend_per_transaction: "0.50",
+    currency: "USDC",
+    allowed_sellers: ["data.example.com", "api.financials.io"],
+    allowed_categories: ["data", "research"],
+    expires_at: "2024-12-31T23:59:59Z",
+  }),
+});
+const mandate = await res.json();
+```
+
+</CodeGroup>
+
+**Response `201`**
+
+<ResponseField name="id" type="string" required>
+  Unique mandate identifier.
+</ResponseField>
+
+<ResponseField name="agent_id" type="string" required>
+  The agent this mandate is attached to.
+</ResponseField>
+
+<ResponseField name="purpose" type="string" required>
+  The purpose description provided at creation.
+</ResponseField>
+
+<ResponseField name="max_spend_total" type="string" required>
+  Total budget as a decimal string.
+</ResponseField>
+
+<ResponseField name="max_spend_per_transaction" type="string" required>
+  Per-transaction ceiling as a decimal string.
+</ResponseField>
+
+<ResponseField name="currency" type="string" required>
+  Currency code, e.g. `"USDC"`.
+</ResponseField>
+
+<ResponseField name="allowed_sellers" type="string[]" required>
+  The merchant domain allowlist for this mandate.
+</ResponseField>
+
+<ResponseField name="allowed_categories" type="string[]" required>
+  The stored category allowlist.
+</ResponseField>
+
+<ResponseField name="expires_at" type="string" required>
+  ISO 8601 expiry timestamp.
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Mandate lifecycle status. One of `"active"`, `"revoked"`, or `"exhausted"`.
+</ResponseField>
+
+<ResponseField name="spent_total" type="string" required>
+  Running total of verified spend against this mandate, as a decimal string.
+</ResponseField>
+
+<ResponseField name="revoked_at" type="string">
+  ISO 8601 timestamp set on revocation. `null` while active.
+</ResponseField>
+
+<ResponseField name="created_at" type="string" required>
+  ISO 8601 creation timestamp.
+</ResponseField>
+
+<ResponseField name="updated_at" type="string" required>
+  ISO 8601 timestamp of the last update.
+</ResponseField>
+
+```json Example response
+{
+  "id": "mandate_xyz789",
+  "agent_id": "agent_abc123",
+  "purpose": "Financial data research",
+  "max_spend_total": "10.000000",
+  "max_spend_per_transaction": "0.500000",
+  "currency": "USDC",
+  "allowed_sellers": ["data.example.com", "api.financials.io"],
+  "allowed_categories": ["data", "research"],
+  "expires_at": "2024-12-31T23:59:59Z",
+  "status": "active",
+  "spent_total": "0.000000",
+  "revoked_at": null,
+  "created_at": "2024-01-15T10:00:00Z",
+  "updated_at": "2024-01-15T10:00:00Z"
+}
+```
+
+**Error responses**
+
+| Status | Detail          | Cause                                              |
+| ------ | --------------- | -------------------------------------------------- |
+| `404`  | `agent_not_found` | The `agent_id` does not exist or is not yours.   |
+
+---
+
+## List mandates
+
+<br />
+
+```
+GET /v1/mandates
+```
+
+Returns all mandates for your account, ordered by creation date descending. Use the `agent_id` query parameter to filter to a specific agent's mandates.
+
+**Query parameters**
+
+<ParamField query="agent_id" type="string">
+  Optional. Filter results to mandates belonging to this agent.
+</ParamField>
+
+<CodeGroup>
+
+```bash cURL
+curl "https://api.kya.dev/v1/mandates?agent_id=agent_abc123" \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••"
+```
+
+```typescript TypeScript
+const res = await fetch(
+  "https://api.kya.dev/v1/mandates?agent_id=agent_abc123",
+  {
+    headers: { Authorization: "Bearer ky_sand_••••••••••••••••" },
+  }
+);
+const { mandates } = await res.json();
+```
+
+</CodeGroup>
+
+**Response `200`**
+
+<ResponseField name="mandates" type="object[]" required>
+  Array of mandate objects. Each object has the same shape as the response from `POST /v1/mandates`.
+</ResponseField>
+
+---
+
+## Get a mandate
+
+<br />
+
+```
+GET /v1/mandates/{mandate_id}
+```
+
+Retrieves a single mandate by ID. Returns `404` if it does not exist or does not belong to your account.
+
+**Path parameters**
+
+<ParamField path="mandate_id" type="string" required>
+  The mandate ID to retrieve.
+</ParamField>
+
+<CodeGroup>
+
+```bash cURL
+curl https://api.kya.dev/v1/mandates/mandate_xyz789 \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••"
+```
+
+```typescript TypeScript
+const res = await fetch("https://api.kya.dev/v1/mandates/mandate_xyz789", {
+  headers: { Authorization: "Bearer ky_sand_••••••••••••••••" },
+});
+const mandate = await res.json();
+```
+
+</CodeGroup>
+
+**Response `200`**
+
+Returns the mandate object. See [Create a mandate](#create-a-mandate) for the full field list.
+
+**Error responses**
+
+| Status | Detail      | Cause                                                    |
+| ------ | ----------- | -------------------------------------------------------- |
+| `404`  | `not_found` | Mandate does not exist or belongs to a different account.|
+
+---
+
+## Revoke a mandate
+
+<br />
+
+```
+PATCH /v1/mandates/{mandate_id}/revoke
+```
+
+Immediately revokes an active mandate. The mandate's status transitions to `"revoked"` and all subsequent policy evaluations against it return `mandate_expired`.
+
+**Path parameters**
+
+<ParamField path="mandate_id" type="string" required>
+  The mandate ID to revoke.
+</ParamField>
+
+<Warning>
+  Revoking a mandate immediately blocks all future payments for the agent-and-mandate pair. This action is irreversible. If you need to adjust spending limits or extend expiry, you must create a new mandate instead.
+</Warning>
+
+<CodeGroup>
+
+```bash cURL
+curl --request PATCH https://api.kya.dev/v1/mandates/mandate_xyz789/revoke \
+  --header "Authorization: Bearer ky_sand_••••••••••••••••"
+```
+
+```typescript TypeScript
+const res = await fetch(
+  "https://api.kya.dev/v1/mandates/mandate_xyz789/revoke",
+  {
+    method: "PATCH",
+    headers: { Authorization: "Bearer ky_sand_••••••••••••••••" },
+  }
+);
+const mandate = await res.json();
+```
+
+</CodeGroup>
+
+**Response `200`**
+
+Returns the updated mandate object with `status: "revoked"` and `revoked_at` set.
+
+```json Example response
+{
+  "id": "mandate_xyz789",
+  "agent_id": "agent_abc123",
+  "status": "revoked",
+  "revoked_at": "2024-01-16T09:00:00Z",
+  "spent_total": "3.500000",
+  "updated_at": "2024-01-16T09:00:00Z"
+}
+```
+
+**Error responses**
+
+| Status | Detail                              | Cause                                      |
+| ------ | ----------------------------------- | ------------------------------------------ |
+| `400`  | `Mandate not found or already revoked` | Mandate is not active or does not exist.|
