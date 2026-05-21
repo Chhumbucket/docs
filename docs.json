@@ -13,6 +13,11 @@
     "dark": "#B45309"
   },
   "css": "/custom.css",
+  "api": {
+    "playground": {
+      "mode": "simple"
+    }
+  },
   "navbar": {
     "primary": {
       "type": "button",
