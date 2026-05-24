@@ -1024,15 +1024,18 @@
         "properties": {
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "example": "Acme Corporation"
           },
           "email": {
             "type": "string",
-            "title": "Email"
+            "title": "Email",
+            "example": "contact@acmecorp.com"
           },
           "supabase_user_id": {
             "type": "string",
-            "title": "Supabase User Id"
+            "title": "Supabase User Id",
+            "example": "user-123e4567-e89b-12d3-a456-426614174000"
           }
         },
         "type": "object",
@@ -1047,7 +1050,8 @@
         "properties": {
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "example": "Research Assistant"
           },
           "description": {
             "anyOf": [
@@ -1058,7 +1062,8 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "example": "Fetches company data from financial APIs"
           },
           "capabilities": {
             "items": {
@@ -1066,7 +1071,11 @@
             },
             "type": "array",
             "title": "Capabilities",
-            "default": []
+            "default": [],
+            "example": [
+              "data-fetch",
+              "financial-research"
+            ]
           }
         },
         "type": "object",
@@ -1086,12 +1095,14 @@
                 "type": "null"
               }
             ],
-            "title": "Label"
+            "title": "Label",
+            "example": "CI runner"
           },
           "key_type": {
             "type": "string",
             "title": "Key Type",
-            "default": "sandbox"
+            "default": "sandbox",
+            "example": "sandbox"
           }
         },
         "type": "object",
@@ -1101,24 +1112,29 @@
         "properties": {
           "agent_id": {
             "type": "string",
-            "title": "Agent Id"
+            "title": "Agent Id",
+            "example": "agt_abc123"
           },
           "purpose": {
             "type": "string",
-            "title": "Purpose"
+            "title": "Purpose",
+            "example": "Fetch financial data from paid APIs"
           },
           "max_spend_total": {
             "type": "string",
-            "title": "Max Spend Total"
+            "title": "Max Spend Total",
+            "example": "100.00"
           },
           "max_spend_per_transaction": {
             "type": "string",
-            "title": "Max Spend Per Transaction"
+            "title": "Max Spend Per Transaction",
+            "example": "10.00"
           },
           "currency": {
             "type": "string",
             "title": "Currency",
-            "default": "USDC"
+            "default": "USDC",
+            "example": "USDC"
           },
           "allowed_sellers": {
             "items": {
@@ -1126,7 +1142,10 @@
             },
             "type": "array",
             "title": "Allowed Sellers",
-            "default": []
+            "default": [],
+            "example": [
+              "api.example.com"
+            ]
           },
           "allowed_categories": {
             "items": {
@@ -1134,11 +1153,15 @@
             },
             "type": "array",
             "title": "Allowed Categories",
-            "default": []
+            "default": [],
+            "example": [
+              "data"
+            ]
           },
           "expires_at": {
             "type": "string",
-            "title": "Expires At"
+            "title": "Expires At",
+            "example": "2026-12-31T00:00:00Z"
           }
         },
         "type": "object",
@@ -1155,11 +1178,13 @@
         "properties": {
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "example": "Example Data API"
           },
           "domain": {
             "type": "string",
-            "title": "Domain"
+            "title": "Domain",
+            "example": "api.example.com"
           },
           "price_config": {
             "anyOf": [
@@ -1185,28 +1210,34 @@
         "properties": {
           "agent_id": {
             "type": "string",
-            "title": "Agent Id"
+            "title": "Agent Id",
+            "example": "agt_abc123"
           },
           "mandate_id": {
             "type": "string",
-            "title": "Mandate Id"
+            "title": "Mandate Id",
+            "example": "mnd_abc123"
           },
           "merchant_domain": {
             "type": "string",
-            "title": "Merchant Domain"
+            "title": "Merchant Domain",
+            "example": "api.example.com"
           },
           "amount": {
             "type": "string",
-            "title": "Amount"
+            "title": "Amount",
+            "example": "5.00"
           },
           "currency": {
             "type": "string",
             "title": "Currency",
-            "default": "USDC"
+            "default": "USDC",
+            "example": "USDC"
           },
           "resource_url": {
             "type": "string",
-            "title": "Resource Url"
+            "title": "Resource Url",
+            "example": "https://api.example.com/data"
           },
           "category": {
             "anyOf": [
@@ -1234,24 +1265,29 @@
         "properties": {
           "agent_id": {
             "type": "string",
-            "title": "Agent Id"
+            "title": "Agent Id",
+            "example": "agt_abc123"
           },
           "mandate_id": {
             "type": "string",
-            "title": "Mandate Id"
+            "title": "Mandate Id",
+            "example": "mnd_abc123"
           },
           "amount": {
             "type": "string",
-            "title": "Amount"
+            "title": "Amount",
+            "example": "5.00"
           },
           "currency": {
             "type": "string",
             "title": "Currency",
-            "default": "USDC"
+            "default": "USDC",
+            "example": "USDC"
           },
           "resource_url": {
             "type": "string",
-            "title": "Resource Url"
+            "title": "Resource Url",
+            "example": "https://api.example.com/data"
           }
         },
         "type": "object",
@@ -1280,17 +1316,20 @@
         "properties": {
           "developer_id": {
             "type": "string",
-            "title": "Developer Id"
+            "title": "Developer Id",
+            "example": "dev_abc123"
           },
           "label": {
             "type": "string",
             "title": "Label",
-            "default": "Recovered dashboard key"
+            "default": "Recovered dashboard key",
+            "example": "Recovered dashboard key"
           },
           "key_type": {
             "type": "string",
             "title": "Key Type",
-            "default": "sandbox"
+            "default": "sandbox",
+            "example": "sandbox"
           }
         },
         "type": "object",
@@ -1343,28 +1382,34 @@
         "properties": {
           "agent_id": {
             "type": "string",
-            "title": "Agent Id"
+            "title": "Agent Id",
+            "example": "agt_abc123"
           },
           "mandate_id": {
             "type": "string",
-            "title": "Mandate Id"
+            "title": "Mandate Id",
+            "example": "mnd_abc123"
           },
           "merchant_domain": {
             "type": "string",
-            "title": "Merchant Domain"
+            "title": "Merchant Domain",
+            "example": "api.example.com"
           },
           "amount": {
             "type": "string",
-            "title": "Amount"
+            "title": "Amount",
+            "example": "5.00"
           },
           "currency": {
             "type": "string",
             "title": "Currency",
-            "default": "USDC"
+            "default": "USDC",
+            "example": "USDC"
           },
           "resource_url": {
             "type": "string",
-            "title": "Resource Url"
+            "title": "Resource Url",
+            "example": "https://api.example.com/data"
           },
           "category": {
             "anyOf": [

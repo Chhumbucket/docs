@@ -6,3 +6,13 @@ body {
   background-image: linear-gradient(180deg, rgba(245, 158, 11, 0.05) 0%, transparent 40%);
 }
 
+/* Uniform size for HTTP method badges (GET, POST, PATCH, DELETE) */
+.method-nav-pill {
+  width: 3.25rem !important;
+}
+
+.method-nav-pill > span {
+  width: 100%;
+  text-align: center;
+}
+

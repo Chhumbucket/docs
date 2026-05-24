@@ -14,6 +14,10 @@
   },
   "css": "/custom.css",
   "api": {
+    "auth": {
+      "method": "bearer",
+      "default": "ky_sand_ZPX3ihoFpc1rAmvleIHrfVSY96axTgoi"
+    },
     "playground": {
       "mode": "simple"
     }
