@@ -1,0 +1,1514 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mandate API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/accounts": {
+      "post": {
+        "summary": "Create Account",
+        "operationId": "create_account_route_accounts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Account Route Accounts Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Accounts"
+        ]
+      }
+    },
+    "/accounts/api-keys": {
+      "post": {
+        "summary": "Create API Key",
+        "operationId": "create_api_key_route_accounts_api_keys_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApiKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Create Api Key Route Accounts Api Keys Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Accounts"
+        ]
+      },
+      "get": {
+        "summary": "List API Keys",
+        "operationId": "list_api_keys_route_accounts_api_keys_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response List Api Keys Route Accounts Api Keys Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Accounts"
+        ]
+      }
+    },
+    "/accounts/api-keys/{key_id}": {
+      "delete": {
+        "summary": "Revoke API Key",
+        "operationId": "revoke_api_key_route_accounts_api_keys__key_id__delete",
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Revoke Api Key Route Accounts Api Keys  Key Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Accounts"
+        ]
+      }
+    },
+    "/accounts/api-keys-admin": {
+      "post": {
+        "summary": "Recover API Key",
+        "operationId": "recover_api_key_route_accounts_api_keys_admin_post",
+        "parameters": [
+          {
+            "name": "x_service_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X Service Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoverApiKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Recover Api Key Route Accounts Api Keys Admin Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Accounts"
+        ]
+      }
+    },
+    "/agents": {
+      "post": {
+        "summary": "Create Agent",
+        "operationId": "create_agent_route_agents_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Create Agent Route Agents Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents"
+        ]
+      },
+      "get": {
+        "summary": "List Agents",
+        "operationId": "list_agents_route_agents_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response List Agents Route Agents Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents"
+        ]
+      }
+    },
+    "/agents/{agent_id}": {
+      "get": {
+        "summary": "Get Agent",
+        "operationId": "get_agent_route_agents__agent_id__get",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Agent Route Agents  Agent Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents"
+        ]
+      }
+    },
+    "/agents/{agent_id}/revoke": {
+      "patch": {
+        "summary": "Revoke Agent",
+        "operationId": "revoke_agent_route_agents__agent_id__revoke_patch",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Revoke Agent Route Agents  Agent Id  Revoke Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents"
+        ]
+      }
+    },
+    "/mandates": {
+      "post": {
+        "summary": "Create Mandate",
+        "operationId": "create_mandate_route_mandates_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMandateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Create Mandate Route Mandates Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Mandates"
+        ]
+      },
+      "get": {
+        "summary": "List Mandates",
+        "operationId": "list_mandates_route_mandates_get",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response List Mandates Route Mandates Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Mandates"
+        ]
+      }
+    },
+    "/mandates/{mandate_id}": {
+      "get": {
+        "summary": "Get Mandate",
+        "operationId": "get_mandate_route_mandates__mandate_id__get",
+        "parameters": [
+          {
+            "name": "mandate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Mandate Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Mandate Route Mandates  Mandate Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Mandates"
+        ]
+      }
+    },
+    "/mandates/{mandate_id}/revoke": {
+      "patch": {
+        "summary": "Revoke Mandate",
+        "operationId": "revoke_mandate_route_mandates__mandate_id__revoke_patch",
+        "parameters": [
+          {
+            "name": "mandate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Mandate Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Revoke Mandate Route Mandates  Mandate Id  Revoke Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Mandates"
+        ]
+      }
+    },
+    "/sellers": {
+      "post": {
+        "summary": "Create Seller",
+        "operationId": "create_seller_route_sellers_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSellerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Create Seller Route Sellers Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Sellers"
+        ]
+      },
+      "get": {
+        "summary": "List Sellers",
+        "operationId": "list_sellers_route_sellers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response List Sellers Route Sellers Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Sellers"
+        ]
+      }
+    },
+    "/policy/evaluate": {
+      "post": {
+        "summary": "Evaluate Policy",
+        "operationId": "evaluate_policy_route_policy_evaluate_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluatePolicyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Policy"
+        ]
+      }
+    },
+    "/payments/proof": {
+      "post": {
+        "summary": "Generate Proof",
+        "operationId": "generate_proof_route_payments_proof_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateProofRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Generate Proof Route Payments Proof Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Payments"
+        ]
+      }
+    },
+    "/payments/verify": {
+      "post": {
+        "summary": "Verify Proof",
+        "operationId": "verify_proof_route_payments_verify_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyProofRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Verify Proof Route Payments Verify Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Payments"
+        ]
+      }
+    },
+    "/verify-agent": {
+      "post": {
+        "summary": "Verify Agent",
+        "operationId": "verify_agent_route_verify_agent_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Verification"
+        ]
+      }
+    },
+    "/transactions": {
+      "get": {
+        "summary": "Transactions",
+        "operationId": "list_transactions_route_transactions_get",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "mandate_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mandate Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response List Transactions Route Transactions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Transactions"
+        ]
+      }
+    },
+    "/audit-log": {
+      "get": {
+        "summary": "Audit Log",
+        "operationId": "list_audit_log_route_audit_log_get",
+        "parameters": [
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "name": "resource_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resource Type"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resource Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response List Audit Log Route Audit Log Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Audit"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateAccountRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "example": "Acme Corporation"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "example": "contact@acmecorp.com"
+          },
+          "supabase_user_id": {
+            "type": "string",
+            "title": "Supabase User Id",
+            "example": "user-123e4567-e89b-12d3-a456-426614174000"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "email",
+          "supabase_user_id"
+        ],
+        "title": "CreateAccountRequest"
+      },
+      "CreateAgentRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "example": "Research Assistant"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "example": "Fetches company data from financial APIs"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capabilities",
+            "default": [],
+            "example": [
+              "data-fetch",
+              "financial-research"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CreateAgentRequest"
+      },
+      "CreateApiKeyRequest": {
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "example": "CI runner"
+          },
+          "key_type": {
+            "type": "string",
+            "title": "Key Type",
+            "default": "sandbox",
+            "example": "sandbox"
+          }
+        },
+        "type": "object",
+        "title": "CreateApiKeyRequest"
+      },
+      "CreateMandateRequest": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id",
+            "example": "agt_abc123"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose",
+            "example": "Fetch financial data from paid APIs"
+          },
+          "max_spend_total": {
+            "type": "string",
+            "title": "Max Spend Total",
+            "example": "100.00"
+          },
+          "max_spend_per_transaction": {
+            "type": "string",
+            "title": "Max Spend Per Transaction",
+            "example": "10.00"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "USDC",
+            "example": "USDC"
+          },
+          "allowed_sellers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Sellers",
+            "default": [],
+            "example": [
+              "api.example.com"
+            ]
+          },
+          "allowed_categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Categories",
+            "default": [],
+            "example": [
+              "data"
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At",
+            "example": "2026-12-31T00:00:00Z"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "purpose",
+          "max_spend_total",
+          "max_spend_per_transaction",
+          "expires_at"
+        ],
+        "title": "CreateMandateRequest"
+      },
+      "CreateSellerRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "example": "Example Data API"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain",
+            "example": "api.example.com"
+          },
+          "price_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Config"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "domain"
+        ],
+        "title": "CreateSellerRequest"
+      },
+      "EvaluatePolicyRequest": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id",
+            "example": "agt_abc123"
+          },
+          "mandate_id": {
+            "type": "string",
+            "title": "Mandate Id",
+            "example": "mnd_abc123"
+          },
+          "merchant_domain": {
+            "type": "string",
+            "title": "Merchant Domain",
+            "example": "api.example.com"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount",
+            "example": "5.00"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "USDC",
+            "example": "USDC"
+          },
+          "resource_url": {
+            "type": "string",
+            "title": "Resource Url",
+            "example": "https://api.example.com/data"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "mandate_id",
+          "merchant_domain",
+          "amount",
+          "resource_url"
+        ],
+        "title": "EvaluatePolicyRequest"
+      },
+      "GenerateProofRequest": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id",
+            "example": "agt_abc123"
+          },
+          "mandate_id": {
+            "type": "string",
+            "title": "Mandate Id",
+            "example": "mnd_abc123"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount",
+            "example": "5.00"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "USDC",
+            "example": "USDC"
+          },
+          "resource_url": {
+            "type": "string",
+            "title": "Resource Url",
+            "example": "https://api.example.com/data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "mandate_id",
+          "amount",
+          "resource_url"
+        ],
+        "title": "GenerateProofRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "RecoverApiKeyRequest": {
+        "properties": {
+          "developer_id": {
+            "type": "string",
+            "title": "Developer Id",
+            "example": "dev_abc123"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "default": "Recovered dashboard key",
+            "example": "Recovered dashboard key"
+          },
+          "key_type": {
+            "type": "string",
+            "title": "Key Type",
+            "default": "sandbox",
+            "example": "sandbox"
+          }
+        },
+        "type": "object",
+        "required": [
+          "developer_id"
+        ],
+        "title": "RecoverApiKeyRequest"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VerifyAgentRequest": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id",
+            "example": "agt_abc123"
+          },
+          "mandate_id": {
+            "type": "string",
+            "title": "Mandate Id",
+            "example": "mnd_abc123"
+          },
+          "merchant_domain": {
+            "type": "string",
+            "title": "Merchant Domain",
+            "example": "api.example.com"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount",
+            "example": "5.00"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "USDC",
+            "example": "USDC"
+          },
+          "resource_url": {
+            "type": "string",
+            "title": "Resource Url",
+            "example": "https://api.example.com/data"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "mandate_id",
+          "merchant_domain",
+          "amount",
+          "resource_url"
+        ],
+        "title": "VerifyAgentRequest"
+      },
+      "VerifyProofRequest": {
+        "properties": {
+          "proof": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Proof"
+          },
+          "merchant_domain": {
+            "type": "string",
+            "title": "Merchant Domain"
+          },
+          "expected_amount": {
+            "type": "string",
+            "title": "Expected Amount"
+          },
+          "expected_currency": {
+            "type": "string",
+            "title": "Expected Currency",
+            "default": "USDC"
+          }
+        },
+        "type": "object",
+        "required": [
+          "proof",
+          "merchant_domain",
+          "expected_amount"
+        ],
+        "title": "VerifyProofRequest"
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Use your sandbox (ky_sand_) or production (ky_prod_) API key"
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.usemandate.io",
+      "description": "Production"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Agents"
+    },
+    {
+      "name": "Mandates"
+    },
+    {
+      "name": "Payments"
+    },
+    {
+      "name": "Sellers"
+    },
+    {
+      "name": "Verification"
+    },
+    {
+      "name": "Transactions"
+    },
+    {
+      "name": "Audit"
+    },
+    {
+      "name": "Accounts"
+    },
+    {
+      "name": "Policy"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ]
+}
