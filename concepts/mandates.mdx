@@ -3,7 +3,7 @@ title: "Mandates: Spending Policies for AI Agents"
 description: "Define what your AI agent is allowed to spend, where it can spend it, and for how long — by attaching a mandate to a registered agent."
 ---
 
-A mandate is a spending policy attached to a specific agent. It answers the question every seller needs answered before accepting a payment: is this agent authorised to pay for this resource right now, and within what limits? Every payment Mandate approves is evaluated against a mandate — no mandate means no payment. You can create multiple mandates for the same agent to scope permissions by purpose, time period, or merchant.
+A mandate is a spending policy attached to a specific agent. It answers the question every seller needs answered before accepting a payment: is this agent authorized to pay for this resource right now, and within what limits? Every payment Mandate approves is evaluated against a mandate — no mandate means no payment. You can create multiple mandates for the same agent to scope permissions by purpose, time period, or merchant.
 
 ## Mandate fields
 
@@ -80,7 +80,7 @@ No request body is required. The response returns the updated mandate object wit
 <Note>
   **`allowed_categories: []` means all categories are allowed — not zero.**
 
-  An empty `allowed_categories` array is a wildcard: the policy engine skips the category check entirely if the array is empty. To restrict an agent to specific categories, you must explicitly list them (e.g., `["data", "compute"]`). This behaviour is intentional — a mandate with no category list is a general-purpose mandate.
+  An empty `allowed_categories` array is a wildcard: the policy engine skips the category check entirely if the array is empty. To restrict an agent to specific categories, you must explicitly list them (e.g., `["data", "compute"]`). This behavior is intentional — a mandate with no category list is a general-purpose mandate.
 </Note>
 
 ### One mandate per purpose
@@ -89,4 +89,4 @@ A mandate belongs to exactly one agent and cannot be transferred. For agents tha
 
 ### Budget is lifetime, not rolling
 
-`max_spend_total` is a lifetime cap tracked by `spent_total`. There is no automatic reset. Once a mandate is exhausted, you must create a new mandate to continue authorising payments for that agent.
+`max_spend_total` is a lifetime cap tracked by `spent_total`. There is no automatic reset. Once a mandate is exhausted, you must create a new mandate to continue authorizing payments for that agent.
